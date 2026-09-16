@@ -450,6 +450,7 @@
         <button id="linkTestBtn" class="wbtn wbtn-p">📡 فحص الربط الحي</button>
         <span id="linkStatus" class="text-xs text-slate-500">لم يُفحص بعد</span>
       </div>
+      <button id="linkMetaBtn" class="wbtn wbtn-ok w-full mb-2">🟦 اربط واتساب العميل عبر Meta (دقيقتان بدل ساعتين)</button>
       <ol class="text-xs text-slate-600 space-y-1 mb-3 list-decimal pr-4">
         <li>العميل يُبقي رقم <b>واتساب بزنس</b> على هاتفه (لا يحذف شيئاً).</li>
         <li>يربط الرقم عبر Meta (Coexistence) ويعطيك <b>Phone ID</b> و <b>Token</b>.</li>
@@ -1633,6 +1634,66 @@ async function sendInvite() {
 }
 
 $("linkTestBtn").onclick = testLink;
+
+// ── Embedded Signup: ربط العميل برقمه بنفسه عبر نافذة Meta ──
+// الزر يفتح FB.login بالـ config، والعميل يكمل: دخول → محفظة → WABA → رقم → صلاحيات.
+// الكود (~60 ثانية) يُبادل server-side ولا يُخزن — التوكن يُشفر على البوت مباشرة.
+let fbSdkLoading = null;
+function loadFbSdk(appId) {
+  if (window.FB) return Promise.resolve();
+  if (fbSdkLoading) return fbSdkLoading;
+  fbSdkLoading = new Promise((resolve, reject) => {
+    window.fbAsyncInit = function () {
+      try { FB.init({ appId, autoLogAppEvents: true, xfbml: false, version: "v21.0" }); resolve(); }
+      catch (e) { reject(e); }
+    };
+    const s = document.createElement("script");
+    s.src = "https://connect.facebook.net/en_US/sdk.js";
+    s.onerror = () => reject(new Error("تعذر تحميل FB SDK"));
+    document.head.appendChild(s);
+    setTimeout(() => reject(new Error("مهلة تحميل FB SDK")), 20000);
+  });
+  return fbSdkLoading;
+}
+async function onboardViaMeta() {
+  if (!linkTenantId) return;
+  $("linkStatus").textContent = "جاري تجهيز ربط Meta...";
+  let cfg;
+  try {
+    cfg = await api("/admin/onboard/config");
+  } catch (e) { toast("تعذر جلب إعدادات الربط: " + e.message, "error"); return; }
+  if (!cfg.enabled) { toast("الربط عبر Meta غير مفعل — أضف META_APP_ID و META_EMBEDDED_CONFIG_ID بالبيئة أولاً", "error"); return; }
+  try { await loadFbSdk(cfg.appId); } catch (e) { toast(e.message, "error"); return; }
+  $("linkStatus").textContent = "بانتظار إتمام الربط بنافذة Meta...";
+  FB.login(async function (resp) {
+    try {
+      if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("linkStatus").textContent = "أُلغي الربط"; return; }
+      const ar = resp.authResponse;
+      if (!ar.phone_number_id) { toast("لم يرجع رقم من Meta — أكمل كل خطوات النافذة", "error"); return; }
+      $("linkStatus").textContent = "جاري تثبيت الربط...";
+      const j = await api("/admin/onboard/exchange", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: linkTenantId, code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id }),
+      });
+      if (j.linked) {
+        $("linkStatus").textContent = "✅ مربوط عبر Meta" + (j.number ? " (" + j.number + ")" : "");
+        $("linkStatus").className = "text-xs font-bold text-green-700";
+        toast("تم الربط عبر Meta ✅", "success");
+      } else { throw new Error(j.error || "فشل التثبيت"); }
+    } catch (e) {
+      $("linkStatus").textContent = "❌ " + e.message;
+      $("linkStatus").className = "text-xs font-bold text-red-600";
+    }
+  }, { config_id: cfg.configId, response_type: "code", override_default_response_type: true, extras: { sessionInfoVersion: "3" } });
+}
+// أحداث نافذة Meta (خطأ) للتنبيه الفوري — النجاح يمر عبر exchange أعلاه
+window.addEventListener("message", (ev) => {
+  try {
+    const d = typeof ev.data === "string" ? JSON.parse(ev.data) : ev.data;
+    if (d?.type === "WA_EMBEDDED_SIGNUP" && d.event === "ERROR") toast("Meta: " + (d.data?.error_message || "خطأ بالربط"), "error");
+  } catch { /* تجاهل */ }
+});
+$("linkMetaBtn").onclick = onboardViaMeta;
 $("linkInviteBtn").onclick = sendInvite;
 $("linkClose").onclick = closeLinkModal;
 

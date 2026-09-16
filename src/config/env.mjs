@@ -32,6 +32,13 @@ export const CRM_WEBHOOK_URL = process.env.CRM_WEBHOOK_URL || "";
 
 export const META_APP_SECRET = process.env.META_APP_SECRET || "";
 
+// ── Embedded Signup: ربط العميل برقمه بنفسه (onboarding ذاتي بدقيقتين) ──
+// المتطلب بلوحة Meta (مرة واحدة): منتج Facebook Login for Business +
+// Configuration ID بصلاحيات whatsapp_business_management/messaging + Allowed Domains.
+// GMAPS: القيم علنية بالتصميم (تُضمن بزر الربط) — السر يبقى META_APP_SECRET فقط.
+export const META_APP_ID = process.env.META_APP_ID || "";
+export const META_EMBEDDED_CONFIG_ID = process.env.META_EMBEDDED_CONFIG_ID || "";
+
 export const VOICE_TIMEOUT_MS = Number(process.env.VOICE_TIMEOUT_MS || 15000);
 export const VOICE_MAX_MB = Number(process.env.VOICE_MAX_MB || 8);
 

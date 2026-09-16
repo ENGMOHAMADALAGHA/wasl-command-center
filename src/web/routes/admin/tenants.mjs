@@ -102,6 +102,63 @@ export function registerTenantRoutes(app) {
       res.json({ ok: false, linked: false, reason: e.message });
     }
   });
+  // ── Embedded Signup: إعداد علني + تبادل الكود (onboarding ذاتي بدقيقتين) ──
+  // الزر بلوحة الإدارة يفتح نافذة Meta، والعميل يربط رقمه بنفسه: دخول → محفظة →
+  // WABA → رقم → صلاحيات. الكود صلاحيته ~60 ثانية ويُبادل server-side فقط.
+  // المتطلب المسبق بلوحة Meta (مرة واحدة): منتج Facebook Login for Business +
+  // Configuration ID بالصلاحيات + Allowed Domains (وإلا enabled=false بزر معطل مبرر).
+  app.get("/admin/onboard/config", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+    const { META_APP_ID, META_EMBEDDED_CONFIG_ID } = await import("../../../config/env.mjs");
+    res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null });
+  });
+  app.post("/admin/onboard/exchange", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+    const { tenantId, code, waba_id, phone_number_id } = req.body || {};
+    if (!tenantId || !code || !phone_number_id) {
+      return res.status(400).json({ ok: false, error: "tenantId و code و phone_number_id مطلوبة" });
+    }
+    try {
+      const { META_APP_ID, META_APP_SECRET } = await import("../../../config/env.mjs");
+      if (!META_APP_ID || !META_APP_SECRET) throw new Error("META_APP_ID/META_APP_SECRET غير مضبوطة بالبيئة");
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 20000);
+      try {
+        // 1) تبادل الكود بتوكن تكامل دائم (server-side فقط — الكود لا يُخزن)
+        const u = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(META_APP_ID)}&client_secret=${encodeURIComponent(META_APP_SECRET)}&code=${encodeURIComponent(code)}`;
+        const r = await fetch(u, { signal: ctrl.signal });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok || !j.access_token) throw new Error(j?.error?.message || ("تعذر تبادل الكود (HTTP " + r.status + ")"));
+        const token = j.access_token;
+        // 2) اشتراك تطبيقنا بأحداث هذه الـ WABA (وصول الرسائل للـ webhook)
+        if (waba_id) {
+          await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(waba_id)}/subscribed_apps`, {
+            method: "POST", headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+          }).catch(() => {});
+        }
+        // 3) بيانات الرقم للعرض والتأكيد فقط
+        let number = null, vname = null;
+        try {
+          const m = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(phone_number_id)}?fields=id,display_phone_number,verified_name`, {
+            headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+          });
+          const mj = await m.json().catch(() => ({}));
+          if (m.ok) { number = mj.display_phone_number || null; vname = mj.verified_name || null; }
+        } catch { /* عرض فقط */ }
+        // 4) ربط البوت: هوية الرقم + التوكن المشفر (تفرد إجباري يمنع الخلط)
+        const { updateTenant } = await import("../../../../tenants.mjs");
+        await updateTenant(tenantId, { phoneNumberId: String(phone_number_id), whatsappToken: token });
+        logEvent("onboard_exchange", { tenantId, waba: waba_id || null, number }).catch(() => {});
+        // التوكن لا يغادر الخادم أبداً — الرد هوية وتأكيد فقط
+        res.json({ ok: true, linked: true, number, name: vname });
+      } finally {
+        clearTimeout(timer);
+      }
+    } catch (e) {
+      logEvent("onboard_failed", { tenantId, error: String(e?.message || e).slice(0, 200) }).catch(() => {});
+      res.status(400).json({ ok: false, error: e.message });
+    }
+  });
   // دعوة عميل: إنشاء حساب بوابة + كلمة مؤقتة + رابط دخول + إرسال واتساب اختياري
   app.post("/admin/invites", async (req, res) => {
     const tenantId = req.clientTenant || req.body?.tenantId;
