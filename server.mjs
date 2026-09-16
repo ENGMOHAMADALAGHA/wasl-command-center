@@ -44,6 +44,20 @@ if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
   process.exit(1);
 }
 
+// P0-4: فشل-سريع للإنتاج — أسرار ناقصة = webhooks مرفوضة (403) أو توكنات مشتركة صامتة.
+// اكتشافها عند الإقلاع بصوت عالٍ بدل تدهور صامت بعد 200 (درس ليلة التسجيل).
+if (process.env.NODE_ENV === "production") {
+  // META_APP_SECRET ناقص = كل الـ webhooks تُرفض 403 (عطل كامل) — ارفض الإقلاع
+  if (!process.env.META_APP_SECRET) {
+    console.error("  ☠️ الإنتاج يتطلب META_APP_SECRET — أرفض الإقلاع (فشل-سريع). أضفه في Render > Environment.");
+    process.exit(1);
+  }
+  // TOKEN_ENC_KEY ناقص = سقوط صامت للتوكن المشترك — تحذير عالٍ (لا إيقاف: البوتات بلا توكن مشفر تعمل بالمشترك)
+  if (!process.env.TOKEN_ENC_KEY) {
+    console.error("  ⚠️ الإنتاج بلا TOKEN_ENC_KEY — أي بوت بتوكن مشفر سيسقط للمشترك. أضفه في Render > Environment.");
+  }
+}
+
 setHttpServer(startServer());
 
 export { httpServer };

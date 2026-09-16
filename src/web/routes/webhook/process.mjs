@@ -38,27 +38,28 @@ export async function processWebhookBody(body) {
         if (!tenant || !phoneNumberId) {
           const why = !phoneNumberId ? "phone_number_id غائب في الدفعة" : `رقم بوت غير مسجل (${phoneNumberId})`;
           console.log(`  ⛔ دفعة بلا tenant مسجل — ${why} — تجاهل كامل`);
+          // P0-1: سجل ميت بدل التجاهل الصامت — تُرى بلوحة CRM وتُتابع
+          logEvent("dead_letter", { scope: "batch", reason: "unknown-tenant", phoneNumberId: phoneNumberId || null }).catch(() => {});
           continue;
         }
 
         for (const msg of messages) {
-          // منع التكرار: نفس الـ wamid لا يُعالج مرتين أبداً (دائم عبر restart)
-          if (msg.id && (await isDuplicateMessageAsync(msg.id))) {
-            console.log(`  🔁 رسالة مكررة (id=${msg.id}) - تم تجاهلها`);
-            continue;
-          }
-          hasMessage = true;
+          // P0-2: الخصم (dedupe) بعد الفحص لا قبله — تُفحص الرسالة أولاً (حد/نص/امتثال)
+          // ثم تُعلَّم. رسالة مُسقطة تبقى غير مُعلَّمة فلا تُحجب إعادتها للأبد.
 
           // درع لكل رسالة على حدة: تعثّر رسالة ما يجب ألا يُسقط باقي دفعة Meta
+          let from = null;
           try {
           // الاستخراج عبر طبقة القنوات (وصل: واتساب/ماسنجر/انستغرام) — نفس السلوك، مصدر واحد
           const ch = getChannel("whatsapp");
           // استخراج رقم العميل ونص الرسالة (يدعم الأزرار + الفويس)
-          const from = ch.normalizeSender(msg.from); // رقم العميل — موحد E.164 دائماً
+          const fromAddr = ch.normalizeSender(msg.from); // رقم العميل — موحد E.164 دائماً
+          from = fromAddr;
           // حد المعدل: 30 رسالة/دقيقة لكل رقم (حماية من الحلقات وتكلفة AI)
           const rl = checkLimit(senderKey(from), 30, 60 * 1000);
           if (!rl.allowed) {
             console.warn(`  ⏱️ تجاوز الحد من ${from} — تم التجاهل (${rl.retryAfter}ث)`);
+            logEvent("dead_letter", { scope: "message", reason: "rate-limited", tenantId: tenant?.id, phone: from, wamid: msg?.id || null, retryAfter: rl.retryAfter }).catch(() => {});
             continue;
           }
           const extracted = ch.extractText(msg, contacts, from);
@@ -80,6 +81,13 @@ export async function processWebhookBody(body) {
 
           // امتثال واتساب قبل أي منطق
           if (await handleCompliance(ctx)) continue;
+
+          // منع التكرار: نفس الـ wamid لا يُعالج مرتين أبداً (دائم عبر restart)
+          if (msg.id && (await isDuplicateMessageAsync(msg.id))) {
+            console.log(`  🔁 رسالة مكررة (id=${msg.id}) - تم تجاهلها`);
+            continue;
+          }
+          hasMessage = true;
 
           console.log(`\n${"─".repeat(60)}`);
           console.log(`  🏢 tenant=${tenant?.id} | بوت=${tenant?.botName}`);
@@ -107,6 +115,8 @@ export async function processWebhookBody(body) {
           console.log(`${"─".repeat(60)}\n`);
           } catch (msgErr) {
             console.error(`  ❌ خطأ معالجة رسالة ${msg?.id || "؟"}: ${msgErr?.message || msgErr}`);
+            // P0-1: أي عطل بالرسالة يُوثق كرسالة ميتة بدل الصمت بعد 200
+            logEvent("dead_letter", { scope: "message", reason: "handler-error", tenantId: tenant?.id, phone: from, wamid: msg?.id || null, error: String(msgErr?.message || msgErr).slice(0, 300) }).catch(() => {});
           }
         }
 
@@ -122,5 +132,10 @@ export async function processWebhookBody(body) {
     }
   } catch (err) {
     console.error(`  ❌ خطأ في معالجة Webhook: ${err.message}`, err.stack);
+    // P0-1: انهيار الدفعة كاملة يُوثق مع عدد الـ entries بدل الصمت بعد 200
+    try {
+      const { logEvent: le } = await import("../../../../crm.mjs");
+      le("dead_letter", { scope: "batch", reason: "processor-crash", error: String(err?.message || err).slice(0, 300), entries: (body.entry || []).length }).catch(() => {});
+    } catch { /* توثيق أفضل جهد */ }
   }
 }

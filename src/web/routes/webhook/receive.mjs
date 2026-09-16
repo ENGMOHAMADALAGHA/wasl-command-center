@@ -6,6 +6,18 @@ import { storeGet, storeSet, storeDel, storeKeys } from "../../../../store.mjs";
 import { channelForWebhookObject } from "../../../channels/registry.mjs";
 import { processWebhookBody } from "./process.mjs";
 import { processMessagingBody } from "./messaging.mjs";
+import { logEvent } from "../../../../crm.mjs";
+
+// P0-1: امتلاء الطابور (QUEUE_FULL) كان رفضاً صامتاً بعد 200 — نوثقه كرسالة ميتة
+// ونحفظ الحمولة بمفتاح dlq لاسترجاعها يدوياً من /admin
+function queueDlq(label, body, err) {
+  console.error(`  ☠️ سقطت [${label}] من الطابور: ${err?.message || err} — حُفظت كرسالة ميتة`);
+  logEvent("dead_letter", { scope: "queue", reason: err?.code || "QUEUE_FULL", label, error: String(err?.message || err).slice(0, 200) }).catch(() => {});
+  try {
+    const key = `dlq:${Date.now()}:${String(label).slice(0, 60)}`;
+    storeSet(key, { at: Date.now(), body }, 7 * 24 * 60 * 60 * 1000).catch(() => {});
+  } catch { /* أفضل جهد */ }
+}
 
 export function registerReceiveRoute(app) {
   app.post("/webhook", verifyMetaSignature, async (req, res) => {
@@ -24,7 +36,7 @@ export function registerReceiveRoute(app) {
       const senderKey = firstEv?.sender?.id ? `sender:${channelId}:${firstEv.sender.id}` : "unknown";
       webhookQueue.enqueueOrdered(senderKey, `${channelId}:${body.entry?.[0]?.id || "event"}`, async () => {
         await processMessagingBody(body, channelId);
-      });
+      }).catch((e) => queueDlq(`${channelId}:messaging`, body, e));
       return;
     }
 
@@ -60,7 +72,7 @@ export function registerReceiveRoute(app) {
       } finally {
         if (hasMessages) await storeDel(inflightKey).catch(() => {});
       }
-    });
+    }).catch((e) => queueDlq("webhook:whatsapp", body, e));
   });
 }
 
