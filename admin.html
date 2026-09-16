@@ -1684,7 +1684,7 @@ async function onboardViaMeta() {
       $("linkStatus").textContent = "❌ " + e.message;
       $("linkStatus").className = "text-xs font-bold text-red-600";
     }
-  }, { config_id: cfg.configId, response_type: "code", override_default_response_type: true, scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", extras: { sessionInfoVersion: "3" } });
+  }, { config_id: cfg.configId, response_type: "code", override_default_response_type: true, scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/admin/", extras: { sessionInfoVersion: "3" } });
 }
 // أحداث نافذة Meta (خطأ) للتنبيه الفوري — النجاح يمر عبر exchange أعلاه
 window.addEventListener("message", (ev) => {
