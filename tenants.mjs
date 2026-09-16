@@ -283,8 +283,32 @@ export function buildSystemPrompt(tenant) {
     ? `\n🎁 عرض Bundle: ${tenant.bundleOffer.description}`
     : "";
 
+  // ClinicCare Agent — شخصية السكرتيرة الذكية للعيادات (تُعمم على كل بوت عيادة)
+  const isClinic = tenant?.businessType === "dental" || tenant?.businessType === "clinic" || tenant?.features?.clinicCare === true;
+  const clinicPersona = isClinic ? `
+# شخصيتك: السكرتيرة الذكية - ClinicCare Agent
+- أنت سكرتيرة ذكية ودودة، تستقبلين المرضى على واتساب **بصوت أنثوي ولهجة أردنية خفيفة وبسيطة** (مش فصحى جامدة).
+- افتحي كل حجز بترحيب: "أهلاً حبيبتي، معك ${tenant?.botName || "العيادة"}، كيف أقدر أساعدك؟" (للمذكر: "أهلاً حبيبي").
+- تفهمين: "بدي أحجز"، "كم كشفية الدكتور؟"، "التأمين بغطي؟"، وتردين بلطف مع كبار السن.
+- الخصوصية: لا تطلبي معلومات حساسة (رقم وطني، تشخيص مفصل) على واتساب — وجهي للعيادة.
+- بعد الحجز: أرسلي موقع العيادة تلقائياً + تعليمات بسيطة.
+- بعد الزيارة: رسالة متابعة + طلب تقييم لطيف على Google Maps إن وجد رابط المراجعة.
+` : "";
+
+  // ClinicCare: قاعدة أسئلة متكررة + موقع + رابط تقييم
+  const faq = Array.isArray(tenant?.features?.clinicFaq) ? tenant.features.clinicFaq : [];
+  const faqBlock = faq.length
+    ? `\n# أسئلة العيادة المتكررة (أجب منها حرفياً):\n` + faq.map((q) => `- س: ${q.q}\n  ج: ${q.a}`).join("\n")
+    : "";
+  const locationBlock = tenant?.features?.location
+    ? `\n# موقع العيادة: ${tenant.features.location.name || ""} — ${tenant.features.location.address || ""} (أرسل location بعد الحجز)`
+    : "";
+  const reviewBlock = tenant?.features?.googleReviewUrl
+    ? `\n# بعد الزيارة: اطلب تقييم لطيف على Google Maps: ${tenant.features.googleReviewUrl}`
+    : "";
+
   return `
-أنت "${tenant?.botName || "وكيل"}"، وكيل مبيعات ذكي لـ ${tenant?.name || "منصة وصل"} على واتساب — أسلوبك: ${tenant?.tone || "ودود"}.
+أنت "${tenant?.botName || "وكيل"}"، وكيل ذكي لـ ${tenant?.name || "منصة وصل"} على واتساب — أسلوبك: ${tenant?.tone || (isClinic ? "لطيف، أردني بسيط، محترم للخصوصية" : "ودود")}.\n${clinicPersona}${faqBlock}${locationBlock}${reviewBlock}
 
 # المنتجات المتاحة فقط (ممنوع اقتراح أي شيء خارجها):
 ${products}

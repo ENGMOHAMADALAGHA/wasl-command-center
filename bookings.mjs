@@ -204,6 +204,43 @@ export async function cancelAppointment(id, tenantId) {
   return rowToBooking(existing);
 }
 
+// ClinicCare: حجوزات اليوم التالية خلال 3 ساعات (تذكير ثانٍ) + متابعة بعد الزيارة بيوم
+export async function dueSoonReminders({ hours = 3 } = {}) {
+  try {
+    const today = isoDay(0);
+    const rows = await systemDb("scheduler:dueSoon").appointment.findMany({
+      where: { status: "confirmed", day: today },
+      take: 100,
+    });
+    // فلترة زمنية بسيطة: slot بصيغة HH:MM ويكون خلال الـ hours القادمة
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return rows
+      .filter((r) => {
+        const m = String(r.slot || "").match(/(\d{1,2}):(\d{2})/);
+        if (!m) return false;
+        const slotMin = parseInt(m[1], 10) * 60 + parseInt(m[2], 10);
+        const diff = slotMin - nowMin;
+        return diff > 0 && diff <= hours * 60;
+      })
+      .map(rowToBooking);
+  } catch {
+    return [];
+  }
+}
+export async function dueFollowups() {
+  try {
+    const yesterday = isoDay(-1);
+    const rows = await systemDb("scheduler:followups").appointment.findMany({
+      where: { status: "confirmed", day: yesterday },
+      take: 50,
+    });
+    return rows.map(rowToBooking);
+  } catch {
+    return [];
+  }
+}
+
 // ── منع التعارض: موعد واحد لكل وقت — سياسة ثابتة (طبيب/مزرعة/تجميل).
 // لا حجوزات مزدوجة أبداً: أي capacity>1 قديمة تُتجاهل مع تحذير (قيد DB فريد).
 export async function countSlotBookings(tenantId, day, slot) {

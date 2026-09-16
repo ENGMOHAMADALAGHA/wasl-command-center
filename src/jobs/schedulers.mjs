@@ -23,7 +23,11 @@ export function startSchedulers() {
         for (const b of due.slice(0, 20)) {
           const tenant = await getTenantFull(b.tenantId);
           if (!tenant || !isTenantActive(tenant)) continue;
-          const msg = `تذكير بموعدك يا غالي ⏰ ${b.service} - يوم ${b.day} - الساعة ${b.slot} (${b.id}) في ${tenant.name}.`;
+          const isClinic = tenant?.businessType === "dental" || tenant?.businessType === "clinic" || tenant?.features?.clinicCare === true;
+          // ClinicCare: تذكير 24 ساعة بنص اللطيف + طلب تأكيد "اضغط 1"
+          const msg = isClinic
+            ? `أهلاً حبيبتي، تذكير موعدك بكرا الساعة ${b.slot} في ${tenant.name} 🌸 للتأكيد اضغط 1، ولإعادة الجدولة ابعتي "تأجيل". بنستناكي!`
+            : `تذكير بموعدك يا غالي ⏰ ${b.service} - يوم ${b.day} - الساعة ${b.slot} (${b.id}) في ${tenant.name}.`;
           // ادّعاء ذري قبل الإرسال — لا رسالتين لنفس الموعد (إما شغل المؤقت أو التشغيل اليدوي)
           const claimed = await markReminded(b.id, b.tenantId);
           if (!claimed) continue;
@@ -43,6 +47,42 @@ export function startSchedulers() {
             console.error(`  ❌ فشل التذكير ${b.id}: ${e.message}`);
           }
         }
+        // ClinicCare: تذكير ثانٍ قبل 3 ساعات + متابعة بعد الزيارة وطلب تقييم Google
+        try {
+          const { dueSoonReminders, dueFollowups } = await import("../../bookings.mjs");
+          // 3 ساعات
+          const soon = (await dueSoonReminders?.({ hours: 3 }).catch(() => [])) || [];
+          for (const b of soon.slice(0, 15)) {
+            const tenant = await getTenantFull(b.tenantId);
+            if (!tenant || !isTenantActive(tenant)) continue;
+            const isClinic = tenant?.businessType === "dental" || tenant?.features?.clinicCare === true;
+            if (!isClinic) continue;
+            const msg = `تذكير: موعدك بعد 3 ساعات الساعة ${b.slot} في ${tenant.name} 🌸 ننتظرك، للتأكيد اضغط 1.`;
+            const { storeGet, storeSet } = await import("../../store.mjs");
+            const key = `remind3h:${b.id}`;
+            if (await storeGet(key).catch(() => null)) continue;
+            await storeSet(key, { at: Date.now() }, 24 * 60 * 60 * 1000).catch(() => {});
+            try {
+              const r = await sendWithWindowFallback(b.phone, msg, tenant);
+              if (r.ok) await pushHistory(b.phone, "assistant", msg, tenant).catch(() => {});
+            } catch {}
+          }
+          // متابعة بعد الزيارة بيوم + رابط Google Maps إن وجد
+          const follows = (await dueFollowups?.().catch(() => [])) || [];
+          for (const b of follows.slice(0, 15)) {
+            const tenant = await getTenantFull(b.tenantId);
+            if (!tenant || !isTenantActive(tenant)) continue;
+            const link = tenant?.features?.googleReviewUrl || tenant?.features?.googleMapsUrl || "";
+            const msg = link
+              ? `نورتينا اليوم في ${tenant.name} 🌸 كيف كانت زيارتك؟ رأيك يهمنا — قيّمينا على Google Maps: ${link}`
+              : `نورتينا اليوم في ${tenant.name} 🌸 كيف كانت زيارتك؟ شاركينا رأيك بكلمة من 1-5.`;
+            try {
+              const r = await sendWithWindowFallback(b.phone, msg, tenant);
+              if (r.ok) await pushHistory(b.phone, "assistant", msg, tenant).catch(() => {});
+              logEvent("followup_sent", { tenantId: b.tenantId, bookingId: b.id }).catch(() => {});
+            } catch {}
+          }
+        } catch {}
         // 2) سلة مهجورة — رسالة واحدة لكل رقم (تجميع الطلبات)
         const carts = await dueCartRemindersAll({ afterMinutes: CART_AFTER_MIN });
         const byPhone = new Map();

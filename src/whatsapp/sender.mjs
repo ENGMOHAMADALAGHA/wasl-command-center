@@ -147,6 +147,14 @@ export async function sendImage(to, link, caption = "", tenantInput = null) {
   }, tenantInput);
 }
 
+export async function sendLocation(to, lat, lng, name = "", address = "", tenantInput = null) {
+  if (lat == null || lng == null) throw new Error("إحداثيات الموقع مطلوبة");
+  return sendPayload(to, {
+    type: "location",
+    location: { latitude: Number(lat), longitude: Number(lng), name: String(name).slice(0, 1000), address: String(address).slice(0, 1000) },
+  }, tenantInput);
+}
+
 // قالب Meta معتمد (للرسائل خارج نافذة 24h) — يتطلب قالباً معتمداً مسبقاً.
 export async function sendTemplate(to, templateName, params = [], tenantInput = null, lang = WA_TEMPLATE_LANG) {
   if (!templateName) throw new Error("اسم القالب مطلوب");
