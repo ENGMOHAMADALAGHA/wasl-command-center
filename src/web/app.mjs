@@ -96,6 +96,23 @@ export function createApp() {
   registerPortalRoutes(app);
   registerWebhookRoutes(app);
 
+  // ── صفحات Meta المطلوبة: سياسة الخصوصية + الشروط + حذف البيانات ──
+  // روابط عمومية (بلا auth) على نفس الدومين — تُستخدم بحقول App Dashboard الأساسية.
+  const legalPage = (title, body) =>
+    `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${title} — Wasl Command Center</title><style>body{font-family:system-ui,Tajawal,Arial;max-width:760px;margin:40px auto;padding:0 20px;line-height:1.9;color:#1e293b}h1{font-size:24px}h2{font-size:18px;margin-top:28px}a{color:#6d28d9}</style></head><body><h1>${title} — وصل (Wasl Command Center)</h1>${body}<hr><p>التواصل: alamosh.mhamad1@gmail.com | آخر تحديث: 2026-09-16</p></body></html>`;
+  app.get("/privacy", (req, res) => {
+    res.type("html").send(legalPage("سياسة الخصوصية",
+      `<p>منصة وصل تربط أرقام واتساب الأنشطة التجارية عبر Meta WhatsApp Cloud API الرسمي لأتمتة الردود والحجوزات والطلبات.</p><h2>البيانات التي نجمعها</h2><p>أرقام الهواتف، محتوى رسائل واتساب اللازمة للرد، بيانات الحجوزات والطلبات، وسجلات تقنية (logs) للتشغيل والحماية.</p><h2>كيف نستخدمها</h2><p>تقديم الخدمة فقط: الرد الآلي، إدارة الحجوزات، إشعارات صاحب النشاط. لا نبيع البيانات ولا نشاركها مع طرف ثالث لأغراض تسويقية.</p><h2>صلاحيات Meta</h2><p>نطلب whatsapp_business_management و whatsapp_business_messaging فقط لربط رقم العميل وإرسال ردوده. التوكنات تُخزن مشفرة على الخادم ولا تغادره.</p><h2>الاحتفاظ والحذف</h2><p>تُحفظ البيانات طوال مدة الاشتراك، وتُحذف عند طلب صاحب النشاط عبر صفحة <a href="/data-deletion">حذف البيانات</a> أو عبر البريد أعلاه خلال 30 يوماً.</p>`));
+  });
+  app.get("/terms", (req, res) => {
+    res.type("html").send(legalPage("شروط الخدمة",
+      `<p>باستخدام منصة وصل أنت توافق على: استخدام المنصة لأنشطة مشروعة فقط، الالتزام بسياسات واتساب وMeta، وعدم إرسال رسائل مزعجة (spam).</p><h2>الاشتراك والإلغاء</h2><p>الخدمة باشتراك شهري لكل بوت، ويمكن الإلغاء بأي وقت من لوحة الإدارة — يتوقف الربط ويُحذف التوكن.</p><h2>المسؤولية</h2><p>المنصة أداة أتمتة؛ صاحب النشاط مسؤول عن محتوى ردوده وعروضه وأسعاره. نبذل جهداً معقولاً للاستمرارية دون ضمان انقطاع صفر.</p>`));
+  });
+  app.get("/data-deletion", (req, res) => {
+    res.type("html").send(legalPage("تعليمات حذف البيانات",
+      `<p>لحذف بيانات نشاطك من منصة وصل:</p><ol><li>راسلنا من بريد النشاط إلى alamosh.mhamad1@gmail.com بعنوان "حذف بيانات" مع اسم البوت ورقم واتساب.</li><li>نحذف المحادثات والحجوزات والطلبات والتوكنات خلال 30 يوماً ونرسل تأكيداً.</li><li>للحذف الفوري من طرف Meta: احذف التطبيق من <a href="https://www.facebook.com/settings?tab=business_tools">إعدادات الأعمال في فيسبوك</a>.</li></ol>`));
+  });
+
   // 404 موحد + ملقم أخطاء يمنع تسرب الستاك
   app.use((req, res) => {
     res.status(404).json({ ok: false, error: "غير موجود" });
