@@ -1658,6 +1658,7 @@ function loadFbSdk(appId) {
 async function onboardViaMeta() {
   if (!linkTenantId) return;
   $("linkStatus").textContent = "جاري تجهيز ربط Meta...";
+  try { sessionStorage.setItem("wasl_pending_link", linkTenantId); } catch {}
   let cfg;
   try {
     cfg = await api("/admin/onboard/config");
@@ -1696,6 +1697,23 @@ window.addEventListener("message", (ev) => {
 $("linkMetaBtn").onclick = onboardViaMeta;
 $("linkInviteBtn").onclick = sendInvite;
 $("linkClose").onclick = closeLinkModal;
+
+// عودة من Meta على الجذري (توكن بالـ hash): الصفحة الأم تحوله لهون —
+// نسترجع البوت المعلق ونطلب ضغطة واحدة للإتمام (الجلسة نشطة فيُرجع الكود فوراً عبر الـ SDK)
+function resumeMetaReturn() {
+  try {
+    const h = window.location.hash || "";
+    if (!/(access_token|code)=/.test(h)) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    const pending = sessionStorage.getItem("wasl_pending_link");
+    if (pending) {
+      try { openLinkModal(pending); } catch { linkTenantId = pending; }
+      $("linkStatus").textContent = "تمت الموافقة من Meta ✅ اضغط زر الربط عبر Meta مرة واحدة للإتمام";
+      $("linkStatus").className = "text-xs font-bold text-green-700";
+      try { sessionStorage.removeItem("wasl_pending_link"); } catch {}
+    }
+  } catch {}
+}
 
 // ── منظور العميل: معاينة حية للبوابة كما يراها العميل (عروض تقديمية) ──
 async function openPreview() {
@@ -1747,6 +1765,7 @@ $("bkTo").addEventListener("input", (e) => autoDate(e.target));
     }
   } catch (e) { /* تجاهل */ }
   await loadTenants();
+  resumeMetaReturn();
   // بالبوابة بدون توكن: نافذة الدخول فقط — لا طلبات خلفية قبل تسجيل الدخول
   // (يمنع حلقة نوافذ النظام بهواتف iOS)
   if (isPortal && !portalToken) return;

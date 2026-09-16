@@ -57,14 +57,24 @@ export function createApp() {
   app.use("/admin", scopeClient);
 
   app.get("/", async (req, res) => {
-    res.json({
+    const tenants = (await listTenants()).length;
+    const status = {
       name: "Wasl Command Center — وصل (Multi-Tenant)",
       status: "running",
       webhook: "/webhook",
       admin: "/admin/tenants",
-      tenants: (await listTenants()).length,
+      tenants,
       mode: isDemoMode ? "DEMO" : AI_PROVIDER,
-    });
+    };
+    // عودة Meta من Embedded Signup قد تهبط هنا بدل /admin/ (redirect URI جذري):
+    // صفحة Forward صغيرة تعيد المتصفح للأدمن مع التوكن/الكود بدل شاشة JSON ميتة.
+    // (عملاء API والمراقبة يقبلون JSON فيبقون على JSON — بلا كسر)
+    if ((req.headers.accept || "").includes("text/html")) {
+      return res.type("html").send(
+        `<!DOCTYPE html><html lang="ar" dir="rtl"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>وصل — Wasl Command Center</title></head><body style="font-family:system-ui,Tajawal,Arial;max-width:640px;margin:60px auto;padding:0 20px;line-height:2;color:#1e293b;text-align:center"><h1>وصل — Wasl Command Center</h1><p>الحالة: يعمل ✅ | البوتات: ${tenants}</p><p><a href="/admin/" style="color:#6d28d9">فتح لوحة الإدارة</a></p><script>(function(){var h=location.hash||"",q=location.search||"";if(/(access_token|code)=/.test(h+q)){location.replace("/admin/"+q+h);}})();<\/script></body></html>`
+      );
+    }
+    res.json(status);
   });
 
   // فحص البقاء/الجاهزية لمزوّد الاستضافة — الآن يختبر القاعدة فعلياً:
