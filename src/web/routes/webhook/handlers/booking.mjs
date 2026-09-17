@@ -336,6 +336,34 @@ export async function handleBooking(ctx) {
       } catch (e) {
         console.error(`  ❌ فشل الإرسال: ${e.message}`);
       }
+      // ClinicCare: موقع العيادة بعد الحجز + مزامنة التقويم (تسجيل فقط حتى OAuth الحقيقي)
+      // القاعدة: فشل الملحقات لا يكسر الحجز أبداً — لكن يُوثق بصوت عالٍ (ممنوع الكتم الصامت)
+      const loc = tenant?.features?.location;
+      const lat = Number(loc?.lat);
+      const lng = Number(loc?.lng);
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        try {
+          const { sendLocation } = await import("../../../../whatsapp/sender.mjs");
+          await sendLocation(from, lat, lng, loc.name || tenant.name, loc.address || "", tenant);
+          await pushHistory(from, "assistant", "[موقع العيادة]", tenant);
+          logEvent("location_sent", { tenantId: tenant.id, bookingId: booking.id }).catch(() => {});
+        } catch (e) {
+          console.error(`  ❌ فشل إرسال الموقع ${booking.id}: ${e.message}`);
+          logEvent("dead_letter", { scope: "booking", reason: "location-failed", tenantId: tenant.id, bookingId: booking.id, error: String(e?.message || e).slice(0, 200) }).catch(() => {});
+        }
+      } else if (loc) {
+        console.warn(`  ⚠️ موقع العيادة ناقص الإحداثيات (${tenant.id}) — تُخطي الإرسال`);
+      }
+      if (tenant?.features?.googleCalendarId) {
+        try {
+          const { syncBookingToGoogleCalendar } = await import("../../../../integrations/googleCalendar.mjs");
+          const r = await syncBookingToGoogleCalendar(booking, tenant);
+          if (!r?.ok) console.warn(`  ⚠️ مزامنة التقويم ${booking.id}: ${r?.reason || "غير معروفة"}`);
+        } catch (e) {
+          console.error(`  ❌ فشل مزامنة التقويم ${booking.id}: ${e.message}`);
+          logEvent("dead_letter", { scope: "booking", reason: "calendar-failed", tenantId: tenant.id, bookingId: booking.id, error: String(e?.message || e).slice(0, 200) }).catch(() => {});
+        }
+      }
       // المالك يتفرج من واتسابه: إشعار فوري بالحجز الجديد
       notifyOwner(tenant, "booking", `📅 حجز جديد: ${service} — ${from} (${name}) — الساعة ${slot} (${booking.id})`).catch(() => {});
       console.log(`  📅 تأكيد حجز ${booking.id} ${tenant.id} ${from} ${slot}`);
