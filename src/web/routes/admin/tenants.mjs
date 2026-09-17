@@ -109,12 +109,13 @@ export function registerTenantRoutes(app) {
   // Configuration ID بالصلاحيات + Allowed Domains (وإلا enabled=false بزر معطل مبرر).
   app.get("/admin/onboard/config", async (req, res) => {
     if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
-    const { META_APP_ID, META_EMBEDDED_CONFIG_ID } = await import("../../../config/env.mjs");
-    res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null });
+    const { META_APP_ID, META_EMBEDDED_CONFIG_ID, META_EMBEDDED_CONFIG_ID_COEX } = await import("../../../config/env.mjs");
+    res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null, coexConfigId: META_EMBEDDED_CONFIG_ID_COEX || null, coexEnabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID_COEX) });
   });
   app.post("/admin/onboard/exchange", async (req, res) => {
     if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
-    const { tenantId, code, waba_id, phone_number_id } = req.body || {};
+    const { tenantId, code, waba_id, phone_number_id, mode } = req.body || {};
+    const onboardingMode = mode === "coexistence" ? "coexistence" : "full";
     if (!tenantId || !code || !phone_number_id) {
       return res.status(400).json({ ok: false, error: "tenantId و code و phone_number_id مطلوبة" });
     }
@@ -146,11 +147,19 @@ export function registerTenantRoutes(app) {
           if (m.ok) { number = mj.display_phone_number || null; vname = mj.verified_name || null; }
         } catch { /* عرض فقط */ }
         // 4) ربط البوت: هوية الرقم + التوكن المشفر (تفرد إجباري يمنع الخلط)
+        // + بصمة وضع الربط: التعايش يحتاجها لاحقاً (كشف الصدى/السجل القديم)
         const { updateTenant } = await import("../../../../tenants.mjs");
-        await updateTenant(tenantId, { phoneNumberId: String(phone_number_id), whatsappToken: token });
-        logEvent("onboard_exchange", { tenantId, waba: waba_id || null, number }).catch(() => {});
+        const { getTenantFull: getFull } = await import("../../../../tenants.mjs");
+        const prev = await getFull(tenantId).catch(() => null);
+        const prevFeatures = (prev && typeof prev.features === "object" && prev.features) || {};
+        await updateTenant(tenantId, {
+          phoneNumberId: String(phone_number_id),
+          whatsappToken: token,
+          features: { ...prevFeatures, onboardingMode, linkedAt: Date.now() },
+        });
+        logEvent("onboard_exchange", { tenantId, waba: waba_id || null, number, mode: onboardingMode }).catch(() => {});
         // التوكن لا يغادر الخادم أبداً — الرد هوية وتأكيد فقط
-        res.json({ ok: true, linked: true, number, name: vname });
+        res.json({ ok: true, linked: true, number, name: vname, mode: onboardingMode });
       } finally {
         clearTimeout(timer);
       }

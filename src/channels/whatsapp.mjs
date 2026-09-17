@@ -12,6 +12,30 @@ export const whatsappChannel = {
     return value?.metadata?.phone_number_id || value?.phone_number_id || null;
   },
 
+  // ── Coexistence: رقم العيادة المعلن من بيانات الدفعة نفسها ──
+  businessNumber(value) {
+    const raw = value?.metadata?.display_phone_number || null;
+    return raw ? normalizePhone(raw) : null;
+  },
+
+  // صدى = رسالة from هو رقم البوت نفسه (الدكتور رد من تطبيق البزنس)
+  isEcho(msg, value) {
+    if (!msg?.from) return false;
+    const biz = whatsappChannel.businessNumber(value);
+    if (!biz) return false;
+    return normalizePhone(msg.from) === biz;
+  },
+
+  // الطرف الثاني للصدى: msg.to أولاً ثم جهات الاتصال (باستثناء رقم البوت) — وإلا null للمراجعة
+  echoCustomer(msg, contacts = [], biz = null) {
+    const to = msg?.to ? normalizePhone(msg.to) : null;
+    if (to && to !== biz) return to;
+    const c = (contacts || [])
+      .map((x) => (x?.wa_id ? normalizePhone(x.wa_id) : null))
+      .find((n) => n && n !== biz);
+    return c || null;
+  },
+
   extractText(msg, contacts = [], from = "") {
     const text =
       msg.text?.body ||

@@ -3,11 +3,11 @@
 import { resolveTenant } from "../../../../tenants.mjs";
 import { getChannel } from "../../../channels/registry.mjs";
 import { checkLimit, senderKey } from "../../../security/rateLimit.mjs";
-import { getHistory, isDuplicateMessageAsync } from "../../../memory/conversations.mjs";
+import { getHistory, isDuplicateMessageAsync, pushHistory } from "../../../memory/conversations.mjs";
 import { getBookingState } from "../../../../bookings.mjs";
 import { logEvent } from "../../../../crm.mjs";
 import { handleVoice, handleReceiptImage } from "./handlers/media.mjs";
-import { handleCompliance, handleStaff } from "./handlers/compliance.mjs";
+import { handleCompliance, handleStaff, handleCoexEcho } from "./handlers/compliance.mjs";
 import { handleCancelIntent, handleOrderQuery, handleCsat } from "./handlers/orders.mjs";
 import { handleProductButtons, handleAi } from "./handlers/ai.mjs";
 import { handleBooking } from "./handlers/booking.mjs";
@@ -55,6 +55,9 @@ export async function processWebhookBody(body) {
           // استخراج رقم العميل ونص الرسالة (يدعم الأزرار + الفويس)
           const fromAddr = ch.normalizeSender(msg.from); // رقم العميل — موحد E.164 دائماً
           from = fromAddr;
+          // Coexistence: صدى العيادة من تطبيقها (from = رقم البوت) — مسار خاص:
+          // تخزين + إيقاف مؤقت، بلا حد معدل ولا امتثال ولا رد أبداً
+          if (await handleCoexEcho({ msg, value, contacts, tenant, ch })) continue;
           // حد المعدل: 30 رسالة/دقيقة لكل رقم (حماية من الحلقات وتكلفة AI)
           const rl = checkLimit(senderKey(from), 30, 60 * 1000);
           if (!rl.allowed) {
@@ -66,6 +69,15 @@ export async function processWebhookBody(body) {
           let text = extracted.text;
           const buttonId = extracted.buttonId;
           const name = extracted.name;
+          // Coexistence + إعادة التشغيل: رسالة أقدم من وقت الربط (مزامنة سجل/دفعة قديمة) —
+          // تخزين صامت فقط: بلا فويس مكلف ولا حجز ولا AI. (سماح 60ث لانحراف الساعات)
+          if (tenant?.features?.linkedAt && Number(msg?.timestamp) * 1000 < Number(tenant.features.linkedAt) - 60000) {
+            if (msg.id && !(await isDuplicateMessageAsync(msg.id))) {
+              await pushHistory(from, "user", text || `[سجل: ${msg.type || "رسالة"}]`, tenant);
+            }
+            console.log(`  🕰️ سجل قديم من ${from} — حُفظ بلا رد (${tenant?.id})`);
+            continue;
+          }
 
           const ctx = { msg, contacts, tenant, from, name, text, buttonId, channel: ch, result: null, wantsBooking: false, bookingState: null };
 

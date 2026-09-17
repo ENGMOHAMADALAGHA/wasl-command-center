@@ -38,6 +38,11 @@ export const META_APP_SECRET = process.env.META_APP_SECRET || "";
 // GMAPS: القيم علنية بالتصميم (تُضمن بزر الربط) — السر يبقى META_APP_SECRET فقط.
 export const META_APP_ID = process.env.META_APP_ID || "";
 export const META_EMBEDDED_CONFIG_ID = process.env.META_EMBEDDED_CONFIG_ID || "";
+// ── Coexistence: كونفج ثاني لمستخدمي تطبيق واتساب بزنس الحاليين (زر الخيار الثاني) ──
+// يُنشأ بلوحة Meta من القالب (Create from template) بنفس الصلاحيات والروابط.
+// غيابه = رجوع تلقائي للكونفج الأساسي (مسار الترحيل) — بلا كسر.
+// (يُضبط أيضاً على Render > Environment ليعمل بالإنتاج)
+export const META_EMBEDDED_CONFIG_ID_COEX = process.env.META_EMBEDDED_CONFIG_ID_COEX || "";
 
 export const VOICE_TIMEOUT_MS = Number(process.env.VOICE_TIMEOUT_MS || 15000);
 export const VOICE_MAX_MB = Number(process.env.VOICE_MAX_MB || 8);

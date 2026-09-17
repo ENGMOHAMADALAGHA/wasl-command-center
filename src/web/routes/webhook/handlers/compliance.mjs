@@ -74,3 +74,39 @@ export async function handleStaff(ctx) {
   }
   return false;
 }
+
+// ── Coexistence: صدى رسائل العيادة من تطبيق واتساب بزنس (نفس الرقم) ──
+// from = رقم البوت نفسه → ليست رسالة زبون: تُخزن بدور staff + إيقاف تلقائي
+// للبوت على هاي المحادثة، وبلا رد أبداً (يمنع رد البوت على كلام الدكتور).
+// الطرف الثاني بأولوية msg.to ثم جهات الاتصال — وإن غاب يُوثق للمراجعة بدل التخمين.
+const COEX_TAKEOVER_MS = 45 * 60 * 1000; // إيقاف 45 دقيقة ثم يعود البوت تلقائياً
+export async function handleCoexEcho({ msg, value, contacts, tenant, ch }) {
+  if (!ch?.isEcho?.(msg, value)) return false;
+  const biz = ch.businessNumber(value);
+  const customer = ch.echoCustomer(msg, contacts || [], biz);
+  const { isDuplicateMessageAsync } = await import("../../../../memory/conversations.mjs");
+  if (msg?.id && (await isDuplicateMessageAsync(msg.id))) return true;
+  if (!customer) {
+    console.warn(`  🪞 صدى تعايش بلا طرف ثانٍ (${tenant?.id}) — حُفظ للمراجعة`);
+    logEvent("dead_letter", { scope: "coex", reason: "echo-unresolved", tenantId: tenant?.id, wamid: msg?.id || null, keys: msg ? Object.keys(msg).slice(0, 12).join(",") : null }).catch(() => {});
+    return true;
+  }
+  const ex = ch.extractText(msg, contacts || [], customer);
+  let text = ex.text;
+  if (!text) {
+    const media = ch.extractMedia ? ch.extractMedia(msg) : null;
+    text = media ? `[من العيادة: ${media.kind === "audio" ? "رسالة صوتية" : "مرفق"}]` : "[من العيادة: مرفق]";
+  }
+  await pushHistory(customer, "staff", text, tenant);
+  // الحية توقف البوت مؤقتاً؛ القديمة (مزامنة سجل) تُخزن بصمت فقط
+  const msgTs = Number(msg?.timestamp) * 1000;
+  const fresh = !msgTs || Date.now() - msgTs < 10 * 60 * 1000;
+  if (fresh) {
+    await setTakeover(tenant?.id, customer, true, "coex:human", COEX_TAKEOVER_MS);
+    logEvent("coex_takeover", { tenantId: tenant?.id, phone: customer }).catch(() => {});
+    console.log(`  🪞 صدى من العيادة إلى ${customer} — حُفظ + إيقاف البوت 45د (${tenant?.id})`);
+  } else {
+    console.log(`  🪞 صدى قديم (مزامنة سجل) إلى ${customer} — حُفظ بصمت`);
+  }
+  return true;
+}
