@@ -1,5 +1,8 @@
+// ──────────────────────────────────────────────
+// امتثال واتساب: إلغاء الاشتراك + تنبيه الموظف + قوالب نافذة 24h
+// ──────────────────────────────────────────────
 // الإرسال الموحد عبر القناة — نقطة التحويل الوحيدة للردود.
-// واتساب: البديل الموحد (opt-out + نافذة 24h + قالب + كشف المحاكاة).
+// واتساب: كل الأنواع (نص/أزرار/صور) عبر بديل الامتثال (opt-out + نافذة 24h + قالب).
 // ماسنجر/انستغرام: فحص opt-out ثم إرسال مباشر عبر محول القناة.
 // كل دوال ctx ترمي عند التخطي/الفشل — المتصلون الحاليون يلتقطونها ويسجلونها already.
 import { getChannel } from "./registry.mjs";
@@ -41,10 +44,10 @@ export async function sendChButtons(ctx, text, buttons) {
     if (await isOptedOut(tenant?.id, from)) throw skipped("opted-out");
     return ch.sendButtons(from, text, buttons, tenant);
   }
-  const { sendWithWindowFallback } = await import("../compliance/messaging.mjs");
-  // الأزرار عبر واتساب تُرسل مباشرة (sender) — البديل للنصوص فقط
-  const { sendButtons } = await import("../whatsapp/sender.mjs");
-  return sendButtons(from, text, buttons, tenant);
+  const { sendButtonsWithFallback } = await import("../compliance/messaging.mjs");
+  const r = await sendButtonsWithFallback(from, text, buttons, tenant);
+  if (!r.ok) throw skipped(r.reason || "send-failed");
+  return r.result;
 }
 
 export async function sendChImage(ctx, link, caption = "") {
@@ -55,6 +58,8 @@ export async function sendChImage(ctx, link, caption = "") {
     if (await isOptedOut(tenant?.id, from)) throw skipped("opted-out");
     return ch.sendImage(from, link, caption, tenant);
   }
-  const { sendImage } = await import("../whatsapp/sender.mjs");
-  return sendImage(from, link, caption, tenant);
+  const { sendImageWithFallback } = await import("../compliance/messaging.mjs");
+  const r = await sendImageWithFallback(from, link, caption, tenant);
+  if (!r.ok) throw skipped(r.reason || "send-failed");
+  return r.result;
 }

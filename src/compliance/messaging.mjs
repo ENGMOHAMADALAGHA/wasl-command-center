@@ -117,3 +117,43 @@ export async function sendWithWindowFallback(to, text, tenant) {
     return { ok: false, reason: "window-closed-no-template" };
   }
 }
+
+// ── إرسال أزرار/صور بنفس الامتثال: opt-out أولاً + بديل القالب خارج 24h ──
+// (كانت sendChButtons/sendChImage ترسلان مباشرة متجاوزتين الحظر والنافذة — ثغرة امتثال)
+async function interactiveFallback(to, text, buttonsOrImage, tenant, kind) {
+  const { sendButtons, sendImage, sendTemplate } = await import("../whatsapp/sender.mjs");
+  const { logEvent } = await import("../../crm.mjs");
+  if (await isOptedOut(tenant?.id, to)) {
+    console.log(`  ⏭️ تخطي [${kind}] لـ ${to} — ألغى الاشتراك`);
+    return { ok: false, reason: "opted-out" };
+  }
+  try {
+    const r = kind === "buttons"
+      ? await sendButtons(to, text, buttonsOrImage, tenant)
+      : await sendImage(to, buttonsOrImage.link, buttonsOrImage.caption || "", tenant);
+    if (r?.simulated) {
+      console.log(`  📤 [محاكاة] [${kind}] لم يخرج لـ ${to} — يُعامل كغير مرسل`);
+      return { ok: false, reason: "simulated-no-credentials" };
+    }
+    return { ok: true, result: r };
+  } catch (e) {
+    if (e?.code !== "WINDOW_CLOSED") throw e;
+    const tpl = tenant?.features?.followupTemplate || WA_FOLLOWUP_TEMPLATE;
+    await logEvent("window_closed", { tenantId: tenant?.id, phone: to, kind }).catch(() => {});
+    if (tpl) {
+      console.log(`  📋 نافذة 24h مغلقة لـ ${to} — قالب نصي بدل [${kind}] ${tpl}`);
+      const r = await sendTemplate(to, tpl, [tenant?.botName || ""], tenant);
+      return { ok: true, result: r, via: "template", degraded: `${kind}-to-text` };
+    }
+    await notifyStaff(tenant, `نافذة 24h مغلقة مع ${to} (${kind}) ولا قالب مهيأ — تواصل يدوياً من واتساب.`);
+    return { ok: false, reason: "window-closed-no-template" };
+  }
+}
+
+export async function sendButtonsWithFallback(to, text, buttons, tenant) {
+  return interactiveFallback(to, text, buttons, tenant, "buttons");
+}
+
+export async function sendImageWithFallback(to, link, caption, tenant) {
+  return interactiveFallback(to, "", { link, caption }, tenant, "image");
+}

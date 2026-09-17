@@ -3,7 +3,7 @@
 import { resolveTenant } from "../../../../tenants.mjs";
 import { getChannel } from "../../../channels/registry.mjs";
 import { checkLimit, senderKey } from "../../../security/rateLimit.mjs";
-import { getHistory, isDuplicateMessageAsync, pushHistory } from "../../../memory/conversations.mjs";
+import { getHistory, isDuplicateMessageAsync, pushHistory, hasSeenMessageAsync } from "../../../memory/conversations.mjs";
 import { getBookingState } from "../../../../bookings.mjs";
 import { logEvent } from "../../../../crm.mjs";
 import { handleVoice, handleReceiptImage } from "./handlers/media.mjs";
@@ -55,6 +55,12 @@ export async function processWebhookBody(body) {
           // استخراج رقم العميل ونص الرسالة (يدعم الأزرار + الفويس)
           const fromAddr = ch.normalizeSender(msg.from); // رقم العميل — موحد E.164 دائماً
           from = fromAddr;
+          // A5: مكرر مبكر (نظرة بلا تعليم) — يمنع إعادة التفريغ الصوتي وتأكيد opt-out
+          // قبل أي تكلفة. التعليم النهائي يبقى لاحقاً بعد الفحوص (P0-2).
+          if (msg.id && (await hasSeenMessageAsync(msg.id))) {
+            console.log(`  🔁 مكرر مبكر (id=${msg.id}) - تم التجاهل بلا تكلفة`);
+            continue;
+          }
           // Coexistence: صدى العيادة من تطبيقها (from = رقم البوت) — مسار خاص:
           // تخزين + إيقاف مؤقت، بلا حد معدل ولا امتثال ولا رد أبداً
           if (await handleCoexEcho({ msg, value, contacts, tenant, ch })) continue;

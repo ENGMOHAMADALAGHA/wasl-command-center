@@ -97,8 +97,14 @@ export async function resolveTenant({ phoneNumberId, verifyToken, pageId, channe
     return null;
   }
   if (verifyToken) {
-    const hit = tenants.find((t) => (t.verifyToken || envVerify) === verifyToken);
-    if (hit) return withEnvDefaults(hit);
+    // A3: مطابقة غامضة مرفوضة — بوتات بلا verifyToken خاص كانت تُسند للأول صامتاً.
+    // مطابقة واحدة = تعمل (توافق قائم)؛ أكثر من واحدة = رفض صريح بدل تخمين بوت.
+    const hits = tenants.filter((t) => (t.verifyToken || envVerify) === verifyToken);
+    if (hits.length > 1) {
+      console.error(`  ⛔ توكن تحقق غامض على ${hits.map((t) => t.id).join("، ")} — أعطِ كل بوت verifyToken خاصاً من /admin/tenants`);
+      return null;
+    }
+    if (hits[0]) return withEnvDefaults(hits[0]);
   }
   // قنوات وصل: ماسنجر/انستغرام تُحل عبر معرف الصفحة/الحساب ببيانات البوت —
   // رقم واحد لكل هوية: التكرار مرفوض مثل أرقام واتساب (fail-closed)

@@ -56,6 +56,12 @@ if (process.env.NODE_ENV === "production") {
   if (!process.env.TOKEN_ENC_KEY) {
     console.error("  ⚠️ الإنتاج بلا TOKEN_ENC_KEY — أي بوت بتوكن مشفر سيسقط للمشترك. أضفه في Render > Environment.");
   }
+  // A4: توكن تحقق افتراضي = خطف اشتراك مؤكد — ارفض الإقلاع (فشل-سريع).
+  // (قبل النشر: قيمة قوية في Render > Environment + تحديث Callback بلوحة Meta بها)
+  if (!process.env.WEBHOOK_VERIFY_TOKEN || process.env.WEBHOOK_VERIFY_TOKEN === "my_secret_token") {
+    console.error("  ☠️ الإنتاج يتطلب WEBHOOK_VERIFY_TOKEN قوياً (غير الافتراضي) — أرفض الإقلاع. اضبطه في Render > Environment وحدّث اشتراك Meta.");
+    process.exit(1);
+  }
 }
 
 setHttpServer(startServer());

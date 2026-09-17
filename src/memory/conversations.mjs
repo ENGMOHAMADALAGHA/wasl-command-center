@@ -84,6 +84,23 @@ export function isDuplicateMessage(msgId) {
   return false;
 }
 
+// A5: نظرة خاطفة بلا تعليم — للمكرر المبكر قبل الفويس/الامتثال (لا تكاليف ولا آثار).
+// التعليم يبقى لاحقاً عبر isDuplicateMessageAsync بعد الفحوص (حماية P0-2 للرسائل المُسقطة).
+export async function hasSeenMessageAsync(msgId) {
+  if (!msgId) return false;
+  try {
+    if (seenMessageIds.has(msgId)) return true;
+  } catch { /* ذاكرة فقط */ }
+  try {
+    const { storeGet } = await import("../../store.mjs");
+    if (await storeGet(`wamid:${msgId}`)) {
+      try { seenMessageIds.set(msgId, Date.now()); } catch { /* تجاهل */ }
+      return true;
+    }
+  } catch { /* الأمان: غير مرئي = عالج */ }
+  return false;
+}
+
 // نسخة دائمة: ذاكرة → Redis (SETNX ذري عبر النسخ) → KvStore/DB.
 // تُستخدم في الـ webhook لمنع الرد المكرر بعد restart أو عند التوسع.
 export async function isDuplicateMessageAsync(msgId) {
