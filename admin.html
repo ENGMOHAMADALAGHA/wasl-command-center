@@ -1687,8 +1687,18 @@ async function onboardViaMeta(mode = "full") {
     toast("الكونفج غير مضبوط بالبيئة", "error"); return;
   }
   try { await loadFbSdk(cfg.appId); } catch (e) { toast(e.message, "error"); return; }
-  $("linkStatus").textContent = "بانتظار إتمام الربط بنافذة Meta...";
+  $("linkStatus").textContent = "بانتظار إتمام الربط بنافذة Meta... (إذا ما فتحت نافذة: اسمح بالنوافذ المنبثقة من أيقونة المتصفح ثم اضغط الزر مرة ثانية)";
+  let fbDone = false;
+  // watchdog: إن علق الانتظار 5 دقائق (نافذة محجوبة غالباً) — نبه بدل التعليق الصامت
+  const fbWatch = setTimeout(() => {
+    if (!fbDone) {
+      $("linkStatus").textContent = "⏳ لسه بانتظار نافذة Meta — إذا ما فتحت أي نافذة فهي محجوبة: اسمح بالنوافذ المنبثقة لهذا الموقع من شريط العنوان واضغط زر الربط مرة ثانية";
+      toast("نافذة Meta محجوبة غالباً — اسمح بالنوافذ المنبثقة وحاول مجدداً", "error");
+    }
+  }, 5 * 60 * 1000);
   FB.login(async function (resp) {
+    fbDone = true;
+    clearTimeout(fbWatch);
     try {
       if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("linkStatus").textContent = "أُلغي الربط"; return; }
       const ar = resp.authResponse;
