@@ -229,38 +229,8 @@
     .stage { padding: .9rem .8rem 3rem; }
   }
 </style>
-<style id="cyber-override">
-  /* Cyberpunk Dark Glassmorphism — overrides light theme, keeps all IDs/JS intact */
-  :root { --cyber-cyan:#00f2fe; --cyber-purple:#7928ca; --cyber-emerald:#10b981; --cyber-amber:#f59e0b; --cyber-pink:#ff0080; }
-  body { background: radial-gradient(900px 500px at 88% -12%, rgba(0,242,254,0.14), transparent 60%), radial-gradient(700px 400px at -6% 8%, rgba(121,40,202,0.18), transparent 62%), radial-gradient(600px 400px at 50% 100%, rgba(16,185,129,0.08), transparent 70%), #0a0d14 !important; color:#e2e8f0 !important; }
-  .side { background: linear-gradient(180deg, rgba(10,13,20,0.98), rgba(15,23,42,0.95)) !important; border-inline-end: 1px solid rgba(255,255,255,0.08) !important; }
-  .brand-mark { background: linear-gradient(135deg, var(--cyber-cyan), #0ea5e9) !important; box-shadow: 0 0 18px rgba(0,242,254,0.5) !important; border: 1px solid rgba(0,242,254,0.3) !important; animation: cyberPulse 2.4s infinite; }
-  @keyframes cyberPulse { 0%,100%{box-shadow:0 0 18px rgba(0,242,254,0.5)} 50%{box-shadow:0 0 28px rgba(0,242,254,0.75)} }
-  .topbar { background: rgba(10,13,20,0.72) !important; backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.4) !important; }
-  .side-nav { color:#94a3b8 !important; border: 1px solid transparent !important; }
-  .side-nav:hover { background: rgba(255,255,255,0.06) !important; color:#e2e8f0 !important; }
-  .side-nav.side-active { background: linear-gradient(135deg, rgba(0,242,254,0.12), rgba(121,40,202,0.12)) !important; color:#fff !important; border-color: rgba(0,242,254,0.25) !important; box-shadow: 0 0 20px rgba(0,242,254,0.15) !important; }
-  .side-nav.side-active::before { content:""; position:absolute; inset-inline-start:0; top:50%; transform:translateY(-50%); width:3px; height:60%; background:var(--cyber-cyan); border-radius:999px; box-shadow:0 0 10px var(--cyber-cyan); }
-  .cyber-card, .bg-white.rounded-xl, .bg-white.rounded.shadow, .bot-card { background: rgba(16,22,34,0.65) !important; backdrop-filter: blur(16px) !important; border: 1px solid rgba(255,255,255,0.08) !important; box-shadow: 0 8px 32px rgba(0,0,0,0.35) !important; color:#e2e8f0 !important; }
-  .kpi-card { backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08) !important; }
-  .kpi-blue { background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(14,165,233,0.12)) !important; border-color: rgba(0,242,254,0.25) !important; }
-  .kpi-green { background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(6,95,70,0.12)) !important; border-color: rgba(16,185,129,0.25) !important; }
-  .kpi-red { background: linear-gradient(135deg, rgba(255,0,128,0.14), rgba(159,18,57,0.12)) !important; border-color: rgba(255,0,128,0.25) !important; }
-  .kpi-amber { background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(146,64,14,0.12)) !important; border-color: rgba(245,158,11,0.25) !important; }
-  .kpi-violet { background: linear-gradient(135deg, rgba(121,40,202,0.18), rgba(76,29,149,0.12)) !important; border-color: rgba(121,40,202,0.25) !important; }
-  .wbtn-p { background: linear-gradient(135deg, var(--cyber-cyan), #0ea5e9) !important; color:#0a0d14 !important; border-color: rgba(0,242,254,0.4) !important; box-shadow: 0 0 15px rgba(0,242,254,0.3) !important; }
-  .wbtn-s { background: rgba(255,255,255,0.06) !important; color:#e2e8f0 !important; border-color: rgba(255,255,255,0.08) !important; }
-  .msg-user { background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(14,165,233,0.12)) !important; border: 1px solid rgba(0,242,254,0.25) !important; color:#e0f2fe !important; }
-  .msg-assistant { background: rgba(22,30,46,0.82) !important; border: 1px solid rgba(255,255,255,0.08) !important; color:#e2e8f0 !important; }
-  table.wtable thead th { background: rgba(255,255,255,0.04) !important; color:#94a3b8 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; }
-  table.wtable tbody td { border-bottom: 1px solid rgba(255,255,255,0.04) !important; color:#cbd5e1 !important; }
-  table.wtable tbody tr:hover { background: rgba(0,242,254,0.04) !important; }
-  .field, .cyber-input, input.field, textarea.field, select.field { background: rgba(10,13,20,0.6) !important; border: 1px solid rgba(255,255,255,0.08) !important; color:#e2e8f0 !important; }
-  .field:focus { border-color: rgba(0,242,254,0.5) !important; box-shadow: 0 0 0 3px rgba(0,242,254,0.12) !important; }
-  .terminal { background:#05070a !important; border: 1px solid rgba(0,242,254,0.15) !important; }
-</style>
 </head>
-<body class="bg-slate-100 text-slate-800" style="background:#0a0d14;color:#e2e8f0">
+<body class="bg-slate-100 text-slate-800">
 <div class="desk">
   <aside class="side">
     <div class="brand">
