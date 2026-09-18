@@ -52,8 +52,8 @@ export function createApp() {
   app.use(csrfGuard);
   // أصول محلية (Tailwind مُضمّن — لا سكربتات خارجية حية داخل الكونسول)
   app.use("/assets", express.static(path.join(__dirname, "..", "..", "assets")));
-  app.use("/admin", adminRateLimit);
   app.use("/admin", adminAuth);
+  app.use("/admin", adminRateLimit);
   app.use("/admin", scopeClient);
 
   app.get("/", async (req, res) => {
