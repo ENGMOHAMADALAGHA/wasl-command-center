@@ -3,245 +3,310 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wasl — Command Center</title>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&family=Inter:wght@600;800&display=swap" rel="stylesheet">
+<title>Wasl — Command Center | Cyber Control</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&family=Cairo:wght@600;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script src="/assets/tailwind.js"></script>
 <style>
-  body { font-family: "Tajawal","Inter",system-ui,sans-serif; }
-  .tab-btn.active { background: #1d4ed8; color: #fff; }
-  .msg-user { background: #ede9fe; border: 1px solid #ddd6fe; margin-left: auto; border-radius: 1rem 1rem .25rem 1rem; }
-  .msg-assistant { background: #f8fafc; border: 1px solid #e2e8f0; margin-right: auto; border-radius: 1rem 1rem 1rem .25rem; }
-  .blink { animation: bl 1s infinite; }
-  @keyframes bl { 50% { opacity: .4; } }
-
-  /* ── Wasl web — خلفية متطورة + زجاج ── */
-  body { background:
-    radial-gradient(800px 400px at 85% -10%, rgba(124,58,237,.10), transparent 60%),
-    radial-gradient(600px 300px at -5% 0%, rgba(14,165,233,.08), transparent 60%),
-    #f1f5f9; }
-  .glass { backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
-
-  /* ── Enterprise console design system ── */
   :root {
-    --saas-radius: 1rem;
-    --saas-shadow: 0 10px 25px -8px rgba(15, 23, 42, .18);
-    --saas-shadow-hover: 0 18px 38px -10px rgba(15, 23, 42, .28);
+    --obsidian: #0a0d14;
+    --surface: rgba(16,22,34,0.65);
+    --surface-strong: rgba(22,30,46,0.82);
+    --line: rgba(255,255,255,0.08);
+    --line-strong: rgba(255,255,255,0.14);
+    --cyan: #00f2fe;
+    --purple: #7928ca;
+    --emerald: #10b981;
+    --amber: #f59e0b;
+    --pink: #ff0080;
   }
-  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .75rem; }
+  * { scrollbar-width: thin; scrollbar-color: rgba(0,242,254,0.3) transparent; }
+  *::-webkit-scrollbar { width: 6px; height: 6px; }
+  *::-webkit-scrollbar-thumb { background: rgba(0,242,254,0.25); border-radius: 999px; }
+  *::-webkit-scrollbar-track { background: transparent; }
+  body {
+    font-family: "Tajawal","Cairo",system-ui,sans-serif;
+    background:
+      radial-gradient(900px 500px at 88% -12%, rgba(0,242,254,0.14), transparent 60%),
+      radial-gradient(700px 400px at -6% 8%, rgba(121,40,202,0.18), transparent 62%),
+      radial-gradient(600px 400px at 50% 100%, rgba(16,185,129,0.08), transparent 70%),
+      var(--obsidian);
+    color: #e2e8f0;
+    min-height: 100vh;
+  }
+  .glass {
+    background: var(--surface);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+  }
+  .glass-strong {
+    background: var(--surface-strong);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--line-strong);
+  }
+  .neon-cyan { color: var(--cyan); }
+  .neon-purple { color: var(--purple); }
+  .glow-cyan { box-shadow: 0 0 15px rgba(0,242,254,0.35), 0 0 40px rgba(0,242,254,0.12); }
+  .glow-purple { box-shadow: 0 0 15px rgba(121,40,202,0.35); }
+  .glow-emerald { box-shadow: 0 0 12px rgba(16,185,129,0.4); }
+  /* Header */
+  .topbar {
+    background: rgba(10,13,20,0.72);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  /* Sidebar */
+  .desk { display: flex; min-height: 100vh; direction: ltr; }
+  .side {
+    direction: rtl; width: 272px; flex-shrink: 0; position: sticky; top: 0; height: 100vh;
+    display: flex; flex-direction: column; gap: .35rem; padding: 1rem .85rem 1rem;
+    background: linear-gradient(180deg, rgba(10,13,20,0.95), rgba(15,23,42,0.92));
+    border-inline-end: 1px solid var(--line);
+    backdrop-filter: blur(12px);
+    overflow-y: auto;
+  }
+  .brand { display: flex; align-items: center; gap: .75rem; padding: .6rem .5rem 1rem; border-bottom: 1px solid var(--line); margin-bottom: .5rem; }
+  .brand-mark {
+    width: 2.9rem; height: 2.9rem; border-radius: 1rem; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
+    background: linear-gradient(135deg, var(--cyan), #0ea5e9);
+    box-shadow: 0 0 18px rgba(0,242,254,0.5), 0 6px 20px rgba(0,0,0,0.4);
+    border: 1px solid rgba(0,242,254,0.3);
+    animation: pulseGlow 2.4s ease-in-out infinite;
+  }
+  @keyframes pulseGlow { 0%,100% { box-shadow: 0 0 18px rgba(0,242,254,0.5); } 50% { box-shadow: 0 0 28px rgba(0,242,254,0.75); } }
+  .brand-name { font-weight: 800; color: #fff; font-size: 1.08rem; line-height: 1.1; }
+  .brand-sub { font-size: .7rem; color: #94a3b8; letter-spacing: .04em; }
+  .live-badge {
+    display: inline-flex; align-items: center; gap: .4rem;
+    font-size: .68rem; font-weight: 800; padding: .25rem .6rem; border-radius: 999px;
+    background: rgba(16,185,129,0.12); color: var(--emerald); border: 1px solid rgba(16,185,129,0.3);
+    box-shadow: 0 0 10px rgba(16,185,129,0.2);
+  }
+  .live-dot { width: .55rem; height: .55rem; border-radius: 50%; background: var(--emerald); box-shadow: 0 0 8px var(--emerald); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+  .side-label { font-size: .68rem; color: #64748b; padding: .75rem .6rem .25rem; letter-spacing: .06em; font-weight: 700; text-transform: uppercase; }
+  .side-nav {
+    display: flex; align-items: center; gap: .75rem; width: 100%;
+    padding: .68rem .85rem; border-radius: .85rem; font-size: .88rem; font-weight: 600;
+    color: #94a3b8; background: transparent; border: 1px solid transparent;
+    transition: all .2s ease; cursor: pointer; text-align: start; position: relative; overflow: hidden;
+  }
+  .side-nav::before {
+    content: ""; position: absolute; inset-inline-start: 0; top: 50%; transform: translateY(-50%);
+    width: 3px; height: 0; background: var(--cyan); border-radius: 999px; transition: height .2s ease; box-shadow: 0 0 10px var(--cyan);
+  }
+  .side-nav:hover { background: rgba(255,255,255,0.06); color: #e2e8f0; border-color: rgba(255,255,255,0.06); }
+  .side-nav.side-active {
+    background: linear-gradient(135deg, rgba(0,242,254,0.12), rgba(121,40,202,0.12));
+    color: #fff; border-color: rgba(0,242,254,0.25);
+    box-shadow: 0 0 20px rgba(0,242,254,0.15), inset 0 1px 0 rgba(255,255,255,0.06);
+  }
+  .side-nav.side-active::before { height: 60%; }
+  .side-nav.side-active .nav-ico { color: var(--cyan); filter: drop-shadow(0 0 6px rgba(0,242,254,0.6)); }
+  .side-nav .nav-ico { font-size: 1.2rem; width: 1.7rem; text-align: center; flex-shrink: 0; transition: all .2s ease; }
+  .side-nav .nav-badge {
+    margin-inline-start: auto; font-size: .68rem; font-weight: 800;
+    background: var(--pink); color: #fff; border-radius: 999px; padding: .1rem .45rem;
+    box-shadow: 0 0 10px rgba(255,0,128,0.4);
+  }
+  .side-foot { margin-top: auto; padding: .9rem .6rem .4rem; border-top: 1px solid var(--line); font-size: .72rem; color: #64748b; }
+  /* Stage */
+  .stage { direction: rtl; flex: 1; min-width: 0; padding: 1.25rem 1.5rem 3rem; max-width: 1420px; }
+  /* Cards */
+  .cyber-card {
+    background: var(--surface);
+    backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line);
+    border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35);
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  }
+  .cyber-card:hover { border-color: rgba(0,242,254,0.18); box-shadow: 0 12px 40px rgba(0,0,0,0.45), 0 0 20px rgba(0,242,254,0.06); }
+  .cyber-input {
+    background: rgba(10,13,20,0.6); border: 1px solid var(--line); color: #e2e8f0;
+    border-radius: .7rem; padding: .6rem .85rem; font-size: .875rem;
+    transition: border-color .2s ease, box-shadow .2s ease;
+  }
+  .cyber-input:focus { outline: none; border-color: rgba(0,242,254,0.5); box-shadow: 0 0 0 3px rgba(0,242,254,0.12); }
+  .cyber-input::placeholder { color: #64748b; }
+  /* Buttons */
+  .wbtn {
+    display: inline-flex; align-items: center; gap: .35rem;
+    font-size: .78rem; font-weight: 700; padding: .55rem .95rem; border-radius: .7rem;
+    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
+    transition: all .2s ease; position: relative; overflow: hidden;
+  }
+  .wbtn:hover { transform: translateY(-1px); }
+  .wbtn:active { transform: scale(.97); }
+  .wbtn-p { background: linear-gradient(135deg, var(--cyan), #0ea5e9); color: #0a0d14; border-color: rgba(0,242,254,0.4); box-shadow: 0 0 15px rgba(0,242,254,0.3); }
+  .wbtn-p:hover { box-shadow: 0 0 22px rgba(0,242,254,0.5); }
+  .wbtn-s { background: rgba(255,255,255,0.06); color: #e2e8f0; border-color: var(--line); backdrop-filter: blur(8px); }
+  .wbtn-s:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.15); }
+  .wbtn-ok { background: rgba(16,185,129,0.15); color: var(--emerald); border-color: rgba(16,185,129,0.3); }
+  .wbtn-ok:hover { background: rgba(16,185,129,0.22); box-shadow: 0 0 12px rgba(16,185,129,0.2); }
+  .wbtn-danger { background: linear-gradient(135deg, var(--pink), #be123c); color: #fff; border-color: rgba(255,0,128,0.3); box-shadow: 0 0 12px rgba(255,0,128,0.25); }
+  .wbtn-warn { background: rgba(245,158,11,0.12); color: var(--amber); border-color: rgba(245,158,11,0.3); }
+  .wbtn-ghost-purple { background: rgba(121,40,202,0.12); color: #c084fc; border-color: rgba(121,40,202,0.35); }
+  .wbtn-ghost-purple:hover { background: rgba(121,40,202,0.2); box-shadow: 0 0 12px rgba(121,40,202,0.25); }
+  /* KPI */
+  .kpi-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .85rem; }
   @media (min-width: 768px) { .kpi-grid { grid-template-columns: repeat(5, 1fr); } }
   .kpi-card {
-    position: relative; overflow: hidden; border-radius: var(--saas-radius);
-    padding: .9rem 1rem; color: #fff; box-shadow: var(--saas-shadow);
-    transition: transform .18s ease, box-shadow .18s ease;
+    position: relative; overflow: hidden; border-radius: 1rem;
+    padding: 1rem 1.1rem; color: #fff; border: 1px solid var(--line);
+    backdrop-filter: blur(16px); transition: transform .2s ease, box-shadow .2s ease;
   }
-  .kpi-card:hover { transform: translateY(-3px); box-shadow: var(--saas-shadow-hover); }
-  .kpi-card::after {
-    content: ""; position: absolute; inset-inline-start: -30px; top: -30px;
-    width: 110px; height: 110px; border-radius: 50%;
-    background: rgba(255, 255, 255, .14);
-  }
-  .kpi-blue { background: linear-gradient(135deg, #2563eb, #1e40af); }
-  .kpi-green { background: linear-gradient(135deg, #059669, #065f46); }
-  .kpi-red { background: linear-gradient(135deg, #dc2626, #7f1d1d); }
-  .kpi-amber { background: linear-gradient(135deg, #d97706, #92400e); }
-  .kpi-violet { background: linear-gradient(135deg, #7c3aed, #4c1d95); }
-  .kpi-num { font-size: 1.7rem; font-weight: 800; line-height: 1.1; }
-  .kpi-label { font-size: .75rem; opacity: .92; }
-
+  .kpi-card:hover { transform: translateY(-3px); }
+  .kpi-card::after { content: ""; position: absolute; inset-inline-start: -20px; top: -20px; width: 90px; height: 90px; border-radius: 50%; background: rgba(255,255,255,0.08); }
+  .kpi-card::before { content: ""; position: absolute; inset: 0; border-radius: 1rem; padding: 1px; background: linear-gradient(135deg, rgba(255,255,255,0.12), transparent); -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0); -webkit-mask-composite: xor; mask-composite: exclude; pointer-events: none; }
+  .kpi-cyan { background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(14,165,233,0.12)); border-color: rgba(0,242,254,0.25); box-shadow: 0 0 20px rgba(0,242,254,0.1); }
+  .kpi-purple { background: linear-gradient(135deg, rgba(121,40,202,0.18), rgba(76,29,149,0.12)); border-color: rgba(121,40,202,0.25); box-shadow: 0 0 20px rgba(121,40,202,0.1); }
+  .kpi-emerald { background: linear-gradient(135deg, rgba(16,185,129,0.18), rgba(6,95,70,0.12)); border-color: rgba(16,185,129,0.25); box-shadow: 0 0 20px rgba(16,185,129,0.1); }
+  .kpi-amber { background: linear-gradient(135deg, rgba(245,158,11,0.18), rgba(146,64,14,0.12)); border-color: rgba(245,158,11,0.25); box-shadow: 0 0 20px rgba(245,158,11,0.08); }
+  .kpi-pink { background: linear-gradient(135deg, rgba(255,0,128,0.14), rgba(159,18,57,0.12)); border-color: rgba(255,0,128,0.25); box-shadow: 0 0 20px rgba(255,0,128,0.08); }
+  .kpi-num { font-size: 1.85rem; font-weight: 800; line-height: 1.1; color: #fff; text-shadow: 0 0 12px currentColor; }
+  .kpi-label { font-size: .75rem; opacity: .85; color: #cbd5e1; }
+  /* Bot cards */
   .bots-grid { display: grid; grid-template-columns: 1fr; gap: .9rem; }
   @media (min-width: 768px) { .bots-grid { grid-template-columns: repeat(2, 1fr); } }
   @media (min-width: 1280px) { .bots-grid { grid-template-columns: repeat(3, 1fr); } }
   .bot-card {
-    background: #fff; border: 1px solid #e2e8f0; border-radius: var(--saas-radius);
-    box-shadow: var(--saas-shadow); overflow: hidden;
-    transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
-    animation: cardIn .3s ease both;
+    background: var(--surface); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--line); border-radius: 1rem;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.35); overflow: hidden;
+    transition: all .22s ease; animation: cardIn .35s ease both;
   }
-  .bot-card:hover { transform: translateY(-4px); box-shadow: var(--saas-shadow-hover); border-color: #bfdbfe; }
-  @keyframes cardIn { from { opacity: 0; transform: translateY(10px); } }
-  .bot-card.suspended { border-color: #fecaca; background: linear-gradient(180deg, #fff, #fef2f2); }
+  .bot-card:hover { transform: translateY(-4px); border-color: rgba(0,242,254,0.2); box-shadow: 0 16px 40px rgba(0,0,0,0.5), 0 0 20px rgba(0,242,254,0.08); }
+  @keyframes cardIn { from { opacity: 0; transform: translateY(12px); } }
+  .bot-card.suspended { border-color: rgba(255,0,128,0.3); background: linear-gradient(180deg, rgba(255,0,128,0.06), var(--surface)); }
   .bot-avatar {
-    width: 3rem; height: 3rem; border-radius: 1rem; flex-shrink: 0;
+    width: 3.1rem; height: 3.1rem; border-radius: 1rem; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.5rem; color: #fff; box-shadow: inset 0 -3px 8px rgba(0,0,0,.2);
+    font-size: 1.45rem; color: #fff; border: 1px solid rgba(255,255,255,0.12);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
   }
-  .av-dental { background: linear-gradient(135deg, #0ea5e9, #0369a1); }
+  .av-dental { background: linear-gradient(135deg, #0ea5e9, #0369a1); box-shadow: 0 0 12px rgba(14,165,233,0.3); }
   .av-sport-store { background: linear-gradient(135deg, #f59e0b, #b45309); }
   .av-retail { background: linear-gradient(135deg, #8b5cf6, #5b21b6); }
   .av-beauty { background: linear-gradient(135deg, #ec4899, #9d174d); }
   .av-restaurant { background: linear-gradient(135deg, #ef4444, #991b1b); }
   .av-farm { background: linear-gradient(135deg, #16a34a, #14532d); }
-  .av-general { background: linear-gradient(135deg, #64748b, #334155); }
+  .av-general { background: linear-gradient(135deg, #334155, #0f172a); }
   .status-pill {
     display: inline-flex; align-items: center; gap: .35rem;
-    font-size: .72rem; font-weight: 700; padding: .15rem .6rem; border-radius: 999px;
+    font-size: .7rem; font-weight: 700; padding: .2rem .6rem; border-radius: 999px;
+    border: 1px solid transparent; backdrop-filter: blur(8px);
   }
-  .st-on { background: #dcfce7; color: #166534; }
-  .st-off { background: #fee2e2; color: #991b1b; }
-  .st-trial { background: #fef3c7; color: #92400e; }
-  .pulse-dot { width: .55rem; height: .55rem; border-radius: 50%; background: currentColor; position: relative; }
-  .st-on .pulse-dot::after {
-    content: ""; position: absolute; inset: -4px; border-radius: 50%;
-    border: 2px solid currentColor; opacity: .6; animation: ping 1.6s ease-out infinite;
+  .st-on { background: rgba(16,185,129,0.15); color: var(--emerald); border-color: rgba(16,185,129,0.3); box-shadow: 0 0 10px rgba(16,185,129,0.2); }
+  .st-off { background: rgba(255,0,128,0.12); color: var(--pink); border-color: rgba(255,0,128,0.3); }
+  .st-trial { background: rgba(245,158,11,0.12); color: var(--amber); border-color: rgba(245,158,11,0.3); }
+  .pulse-dot { width: .5rem; height: .5rem; border-radius: 50%; background: currentColor; box-shadow: 0 0 8px currentColor; position: relative; }
+  .st-on .pulse-dot::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 1px solid currentColor; opacity: .5; animation: ping 1.6s ease-out infinite; }
+  @keyframes ping { 0% { transform: scale(.6); opacity: .7; } 100% { transform: scale(1.4); opacity: 0; } }
+  .chip { font-size: .68rem; padding: .18rem .5rem; border-radius: .5rem; background: rgba(255,255,255,0.06); color: #94a3b8; border: 1px solid var(--line); }
+  .bot-toolbar { display: flex; gap: .35rem; padding-top: .6rem; border-top: 1px solid var(--line); margin-top: .6rem; }
+  .tool-btn { flex: 1; font-size: .72rem; font-weight: 700; padding: .48rem .2rem; border-radius: .6rem; border: 1px solid transparent; transition: all .15s ease; cursor: pointer; }
+  .tool-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+  /* Chat bubbles */
+  .msg-user {
+    background: linear-gradient(135deg, rgba(0,242,254,0.18), rgba(14,165,233,0.12));
+    border: 1px solid rgba(0,242,254,0.25); color: #e0f2fe;
+    margin-left: auto; border-radius: 1rem 1rem .3rem 1rem;
+    box-shadow: 0 0 12px rgba(0,242,254,0.1);
   }
-  @keyframes ping { 0% { transform: scale(.5); opacity: .8; } 100% { transform: scale(1.2); opacity: 0; } }
-  .chip { font-size: .7rem; padding: .1rem .5rem; border-radius: .5rem; background: #f1f5f9; color: #475569; }
-  .bot-toolbar { display: flex; gap: .4rem; padding-top: .5rem; border-top: 1px dashed #e2e8f0; margin-top: .5rem; }
-  .tool-btn { flex: 1; font-size: .75rem; font-weight: 700; padding: .45rem .2rem; border-radius: .6rem; transition: filter .15s ease, transform .1s ease; }
-  .tool-btn:hover { filter: brightness(.94); }
-  .tool-btn:active { transform: scale(.97); }
-
+  .msg-assistant {
+    background: var(--surface-strong); border: 1px solid var(--line); color: #e2e8f0;
+    margin-right: auto; border-radius: 1rem 1rem 1rem .3rem;
+    position: relative;
+  }
+  .msg-assistant.ai-generated { border-color: rgba(0,242,254,0.3); box-shadow: 0 0 14px rgba(0,242,254,0.08); }
+  .msg-assistant.ai-generated::before {
+    content: "AI Generated"; position: absolute; top: -.6rem; inset-inline-end: .6rem;
+    font-size: .6rem; font-weight: 700; padding: .1rem .4rem; border-radius: 999px;
+    background: var(--cyan); color: #0a0d14; letter-spacing: .04em;
+  }
+  /* Tables */
+  .wtoolbar {
+    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
+    background: var(--surface); backdrop-filter: blur(12px);
+    border: 1px solid var(--line); border-radius: 1rem;
+    padding: .65rem .85rem; margin-bottom: .85rem;
+  }
+  .wtoolbar .wtitle { font-weight: 800; font-size: .95rem; margin-inline-end: auto; display: flex; align-items: center; gap: .45rem; color: #fff; }
+  table.wtable { width: 100%; font-size: .84rem; border-collapse: separate; border-spacing: 0; }
+  table.wtable thead th {
+    background: rgba(255,255,255,0.04); color: #94a3b8; font-size: .72rem; font-weight: 800;
+    padding: .7rem .6rem; border-bottom: 1px solid var(--line); white-space: nowrap; text-transform: uppercase; letter-spacing: .04em;
+  }
+  table.wtable tbody td { padding: .7rem .6rem; border-bottom: 1px solid rgba(255,255,255,0.04); vertical-align: middle; color: #cbd5e1; }
+  table.wtable tbody tr { transition: background .15s ease; }
+  table.wtable tbody tr:hover { background: rgba(0,242,254,0.04); }
+  .wempty { text-align: center; color: #64748b; padding: 1.6rem; font-size: .85rem; }
   /* Wizard */
   .glass-overlay {
     position: fixed; inset: 0; z-index: 50; display: flex;
     align-items: center; justify-content: center; padding: 1rem;
-    background: rgba(15, 23, 42, .55); backdrop-filter: blur(6px);
-    animation: fadeIn .2s ease;
+    background: rgba(0,0,0,0.65); backdrop-filter: blur(10px);
   }
-  @keyframes fadeIn { from { opacity: 0; } }
   .wizard-card {
-    background: #fff; border-radius: 1.25rem; width: 32rem; max-width: 96vw;
-    max-height: 92vh; overflow: auto; box-shadow: 0 30px 60px -15px rgba(0,0,0,.4);
-    animation: popIn .25s cubic-bezier(.2,.9,.3,1.2);
+    background: linear-gradient(180deg, rgba(22,30,46,0.96), rgba(10,13,20,0.98));
+    border: 1px solid rgba(255,255,255,0.08); border-radius: 1.25rem;
+    width: 32rem; max-width: 96vw; max-height: 92vh; overflow: auto;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.6), 0 0 40px rgba(0,242,254,0.08);
+    backdrop-filter: blur(20px);
   }
-  @keyframes popIn { from { opacity: 0; transform: translateY(16px) scale(.98); } }
-  .wiz-steps { display: flex; gap: .25rem; }
-  .wiz-step { flex: 1; text-align: center; font-size: .68rem; color: #94a3b8; }
-  .wiz-step .dot {
-    width: 1.9rem; height: 1.9rem; margin: 0 auto .2rem; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    background: #e2e8f0; color: #64748b; font-weight: 800; transition: all .2s ease;
+  .wiz-step .dot { background: rgba(255,255,255,0.08); color: #64748b; border: 1px solid var(--line); }
+  .wiz-step.done .dot { background: rgba(16,185,129,0.2); color: var(--emerald); border-color: rgba(16,185,129,0.3); }
+  .wiz-step.now .dot { background: var(--cyan); color: #0a0d14; box-shadow: 0 0 12px rgba(0,242,254,0.4); border-color: var(--cyan); }
+  .wiz-step.now { color: var(--cyan); }
+  .field { width: 100%; background: rgba(10,13,20,0.7); border: 1px solid var(--line); color: #e2e8f0; border-radius: .7rem; padding: .6rem .8rem; font-size: .875rem; }
+  .field:focus { outline: none; border-color: rgba(0,242,254,0.5); box-shadow: 0 0 0 3px rgba(0,242,254,0.12); }
+  .field-err { border-color: var(--pink) !important; box-shadow: 0 0 0 3px rgba(255,0,128,0.15) !important; }
+  /* Terminal */
+  .terminal {
+    background: #05070a; border: 1px solid rgba(0,242,254,0.15); border-radius: 1rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.04), 0 8px 32px rgba(0,0,0,0.5);
+    font-family: "JetBrains Mono", monospace;
   }
-  .wiz-step.done .dot { background: #bbf7d0; color: #166534; }
-  .wiz-step.now .dot { background: #1d4ed8; color: #fff; box-shadow: 0 0 0 4px #bfdbfe; }
-  .wiz-step.now { color: #1e40af; font-weight: 700; }
-  .wiz-pane { animation: slideIn .22s ease; }
-  @keyframes slideIn { from { opacity: 0; transform: translateX(-14px); } }
-  .field { width: 100%; border: 1px solid #cbd5e1; border-radius: .6rem; padding: .55rem .7rem; font-size: .875rem; }
-  .field:focus { outline: none; border-color: #2563eb; box-shadow: 0 0 0 3px #bfdbfe; }
-  .field-err { border-color: #ef4444 !important; box-shadow: 0 0 0 3px #fecaca !important; }
-  .skeleton {
-    border-radius: var(--saas-radius); min-height: 9rem;
-    background: linear-gradient(90deg, #e2e8f0 25%, #f1f5f9 50%, #e2e8f0 75%);
-    background-size: 200% 100%; animation: shimmer 1.2s infinite;
+  .terminal-head {
+    display: flex; align-items: center; gap: .4rem; padding: .6rem .9rem;
+    border-bottom: 1px solid var(--line); background: rgba(255,255,255,0.03);
+    border-radius: 1rem 1rem 0 0;
   }
-  @keyframes shimmer { to { background-position: -200% 0; } }
-
-  /* ── Wasl unified theme: بنفسجي واحد أساسي + محايد للثانوي ── */
-  :root {
-    --wasl-p1: #7c3aed; --wasl-p2: #4c1d95;
-    --wasl-grad: linear-gradient(135deg, #7c3aed, #4c1d95);
-    --wasl-soft: #f1f5f9; --wasl-line: #e2e8f0;
-  }
-  .side-nav.side-active {
-    background: var(--wasl-grad);
-    border-color: rgba(196,181,253,.4);
-    box-shadow: 0 8px 18px -6px rgba(124, 58, 237, .55);
-  }
-  .brand-mark { background: var(--wasl-grad); box-shadow: 0 6px 16px -4px rgba(124,58,237,.6); }
-  .tab-btn.active { background: var(--wasl-p1); color: #fff; }
-  .wtoolbar {
-    display: flex; align-items: center; gap: .5rem; flex-wrap: wrap;
-    background: rgba(255,255,255,.9); backdrop-filter: blur(8px);
-    border: 1px solid rgba(226,232,240,.9); border-radius: 1rem;
-    padding: .6rem .8rem; margin-bottom: .7rem; box-shadow: 0 6px 18px -10px rgba(15,23,42,.12);
-  }
-  .wtoolbar .wtitle { font-weight: 800; font-size: .95rem; margin-inline-end: auto; display: flex; align-items: center; gap: .4rem; }
-  .wbtn {
-    display: inline-flex; align-items: center; gap: .3rem;
-    font-size: .78rem; font-weight: 700; padding: .5rem .9rem; border-radius: .7rem;
-    border: 1px solid transparent; cursor: pointer; white-space: nowrap;
-    transition: filter .15s ease, transform .1s ease, box-shadow .15s ease;
-  }
-  .wbtn:hover { filter: brightness(.95); }
-  .wbtn:active { transform: scale(.97); }
-  .wbtn-p { background: var(--wasl-grad); color: #fff; box-shadow: 0 6px 14px -6px rgba(124,58,237,.6); }
-  .wbtn-s { background: #fff; color: #334155; border-color: var(--wasl-line); }
-  .wbtn-s:hover { background: #f8fafc; }
-  .wbtn-ok { background: #ecfdf5; color: #065f46; border-color: #a7f3d0; }
-  .wbtn-ok:hover { background: #d1fae5; }
-  .wbtn-danger { background: linear-gradient(135deg,#dc2626,#7f1d1d); color: #fff; }
-  .wbtn-warn { background: #fffbeb; color: #92400e; border-color: #fde68a; }
-  table.wtable { width: 100%; font-size: .85rem; border-collapse: collapse; }
-  table.wtable thead th {
-    background: #f1f5f9; color: #475569; font-size: .75rem; font-weight: 800;
-    padding: .6rem .5rem; border-bottom: 2px solid var(--wasl-line); white-space: nowrap;
-  }
-  table.wtable tbody td { padding: .6rem .5rem; border-bottom: 1px solid #f1f5f9; vertical-align: middle; }
-  table.wtable tbody tr:hover { background: #faf5ff; }
-  table.wtable tbody tr:last-child td { border-bottom: none; }
-  .wempty { text-align: center; color: #94a3b8; padding: 1.4rem; font-size: .85rem; }
-
-  /* ── Desktop console shell: left sidebar + workspace canvas ── */
-  .desk { display: flex; min-height: 100vh; direction: ltr; }
-  .side {
-    direction: rtl; width: 248px; flex-shrink: 0; position: sticky; top: 0; height: 100vh;
-    display: flex; flex-direction: column; gap: .25rem; padding: 1rem .8rem;
-    background: linear-gradient(180deg, #0b1220, #111c33);
-    color: #cbd5e1; border-inline-end: 1px solid rgba(255,255,255,.06);
-  }
-  .brand { display: flex; align-items: center; gap: .6rem; padding: .4rem .5rem 1rem; }
-  .brand-mark {
-    width: 2.6rem; height: 2.6rem; border-radius: .9rem; flex-shrink: 0;
-    display: flex; align-items: center; justify-content: center; font-size: 1.5rem;
-    background: linear-gradient(135deg, #2563eb, #1e1b4b);
-    box-shadow: 0 6px 16px -4px rgba(37, 99, 235, .6);
-  }
-  .brand-name { font-weight: 800; color: #fff; font-size: 1.02rem; line-height: 1.2; }
-  .brand-sub { font-size: .68rem; color: #64748b; }
-  .side-label { font-size: .68rem; color: #64748b; padding: .6rem .6rem .2rem; letter-spacing: .02em; }
-  .side-nav {
-    display: flex; align-items: center; gap: .7rem; width: 100%;
-    padding: .62rem .8rem; border-radius: .75rem; font-size: .9rem; font-weight: 600;
-    color: #94a3b8; background: transparent; border: 1px solid transparent;
-    transition: all .16s ease; cursor: pointer; text-align: start;
-  }
-  .side-nav:hover { background: rgba(255,255,255,.06); color: #e2e8f0; }
-  .side-nav.side-active {
-    background: linear-gradient(135deg, rgba(37,99,235,.9), rgba(30,64,175,.9));
-    color: #fff; border-color: rgba(147,197,253,.35);
-    box-shadow: 0 8px 18px -6px rgba(37, 99, 235, .55);
-  }
-  .side-nav .nav-ico { font-size: 1.15rem; width: 1.6rem; text-align: center; flex-shrink: 0; }
-  .side-nav .nav-badge {
-    margin-inline-start: auto; font-size: .68rem; font-weight: 800;
-    background: #ef4444; color: #fff; border-radius: 999px; padding: .05rem .45rem;
-  }
-  .side-foot { margin-top: auto; padding: .8rem .6rem .2rem; border-top: 1px solid rgba(255,255,255,.08); font-size: .72rem; color: #64748b; }
-  .side-foot .live { color: #4ade80; font-weight: 700; }
-  .stage { direction: rtl; flex: 1; min-width: 0; padding: 1.2rem 1.4rem 3rem; max-width: 1400px; }
-  .topbar {
-    display: flex; align-items: center; gap: .8rem; margin-bottom: 1rem;
-    background: rgba(255,255,255,.82); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
-    border: 1px solid rgba(226,232,240,.9); border-radius: 1rem; padding: .7rem 1rem;
-    box-shadow: 0 8px 24px -12px rgba(15,23,42,.18); position: sticky; top: .8rem; z-index: 20;
-  }
-  .page-title { font-size: 1.25rem; font-weight: 800; }
-  .desk-chip {
-    font-size: .68rem; font-weight: 800; padding: .2rem .6rem; border-radius: 999px;
-    background: linear-gradient(135deg, #0ea5e9, #0369a1); color: #fff;
-  }
+  .term-dot { width: .6rem; height: .6rem; border-radius: 50%; }
+  .term-dot.r { background: #ff5f56; box-shadow: 0 0 8px rgba(255,95,86,0.4); }
+  .term-dot.y { background: #ffbd2e; }
+  .term-dot.g { background: #27c93f; box-shadow: 0 0 8px rgba(39,201,63,0.4); }
   @media (max-width: 920px) {
-    .side { width: 78px; padding: 1rem .5rem; }
+    .side { width: 76px; padding: 1rem .45rem; }
     .side .nav-label, .side .brand-text, .side .side-label, .side-foot .foot-txt { display: none; }
-    .side-nav { justify-content: center; padding: .62rem .4rem; }
+    .side-nav { justify-content: center; padding: .65rem .4rem; }
     .side-nav .nav-badge { position: absolute; margin: 0; transform: translate(14px, -12px); }
-    .stage { padding: .9rem .8rem 3rem; }
+    .stage { padding: 1rem .85rem 3rem; }
   }
 </style>
 </head>
-<body class="bg-slate-100 text-slate-800">
+<body class="text-slate-200">
 <div class="desk">
   <aside class="side">
     <div class="brand">
       <div class="brand-mark">🤖</div>
       <div class="brand-text">
-        <div class="brand-name">وصل <span style="font-size:.7rem;opacity:.7">Wasl</span></div>
-        <div class="brand-sub">Command Center</div>
+        <div class="brand-name">وصل <span style="font-size:.72rem;opacity:.6;font-weight:400">Command Center</span></div>
+        <div class="brand-sub">Cyber Control • v1.0</div>
       </div>
     </div>
+    <div style="padding:0 .4rem .4rem; display:flex; align-items:center; gap:.4rem;">
+      <span class="live-badge"><span class="live-dot"></span> مباشر</span>
+      <span id="deskChip" class="hidden" style="font-size:.65rem;color:#64748b;">🖥 سطح المكتب</span>
+    </div>
     <div class="side-label">العمليات</div>
-    <button class="side-nav" data-tab="inbox"><span class="nav-ico">📥</span><span class="nav-label">المحادثات</span><span class="nav-badge hidden" id="navInboxBadge"></span></button>
+    <button class="side-nav" data-tab="inbox"><span class="nav-ico">💬</span><span class="nav-label">المحادثات</span><span class="nav-badge hidden" id="navInboxBadge"></span></button>
     <button class="side-nav" data-tab="orders"><span class="nav-ico">🧾</span><span class="nav-label">الطلبات والفواتير</span></button>
     <button class="side-nav" data-tab="booking"><span class="nav-ico">📅</span><span class="nav-label">الحجوزات</span></button>
     <div class="side-label">التسويق والجودة</div>
@@ -250,17 +315,23 @@
     <div class="side-label">الإدارة</div>
     <button class="side-nav" data-tab="report"><span class="nav-ico">📊</span><span class="nav-label">نظرة عامة</span></button>
     <button class="side-nav" data-tab="bots" id="botsNavBtn"><span class="nav-ico">🤖</span><span class="nav-label">البوتات</span></button>
-    <button class="side-nav" data-tab="crm"><span class="nav-ico">🧾</span><span class="nav-label">سجلات النظام</span></button>
+    <button class="side-nav" data-tab="crm"><span class="nav-ico">🧬</span><span class="nav-label">سجلات النظام</span></button>
     <div class="side-foot">
-      <div><span id="liveDot" class="live">●</span> <span class="foot-txt">مباشر — v1.0</span></div>
+      <div class="foot-txt" style="display:flex;align-items:center;gap:.4rem;"><span style="width:.5rem;height:.5rem;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald);display:inline-block"></span> النظام نشط</div>
+      <div class="foot-txt" style="font-size:.68rem;opacity:.6;margin-top:.25rem">Obsidian Cyber • Glass</div>
     </div>
   </aside>
   <main class="stage">
     <header class="topbar">
-      <div class="page-title" id="pageTitle">المحادثات</div>
-      <span id="deskChip" class="desk-chip hidden">🖥 تطبيق سطح المكتب</span>
-      <button id="previewBtn" class="wbtn wbtn-p">👁 منظور العميل</button>
-      <select id="tenantSel" class="mr-auto border rounded-lg p-2 text-sm bg-white"></select>
+      <div style="display:flex;align-items:center;gap:.6rem">
+        <div style="width:2rem;height:2rem;border-radius:.6rem;background:linear-gradient(135deg,var(--cyan),#0ea5e9);display:flex;align-items:center;justify-content:center;box-shadow:0 0 12px rgba(0,242,254,0.4)">🤖</div>
+        <div>
+          <div class="page-title" id="pageTitle" style="font-size:1.15rem;font-weight:800;color:#fff;letter-spacing:-.02em">المحادثات</div>
+          <div style="font-size:.68rem;color:#64748b">Wasl Command Center — منصة الذكاء</div>
+        </div>
+      </div>
+      <button id="previewBtn" class="wbtn wbtn-ghost-purple" style="margin-inline-start:auto">👁 منظور العميل</button>
+      <select id="tenantSel" class="cyber-input" style="min-width:180px;max-width:220px"></select>
     </header>
 
   <div class="hidden" id="tabs">
@@ -274,96 +345,132 @@
     <button data-tab="bots" id="botsTabBtn" class="tab-btn px-4 py-2 rounded bg-white shadow">🤖 البوتات</button>
   </div>
 
-  <!-- Inbox -->
-  <div id="tab-inbox" class="grid grid-cols-1 md:grid-cols-3 gap-4">
-    <div class="bg-white rounded-xl shadow p-3 border border-slate-200">
-      <h3 class="font-bold mb-2 flex items-center gap-2">المحادثات <span id="inboxCount" class="text-xs bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full"></span></h3>
-      <div id="convList" class="space-y-2 max-h-[60vh] overflow-auto"></div>
-    </div>
-    <div class="bg-white rounded-xl shadow p-3 md:col-span-2 flex flex-col border border-slate-200">
-      <div class="flex items-center gap-2 mb-2">
-        <h3 id="convTitle" class="font-bold">اختر محادثة</h3>
-        <button id="takeoverBtn" class="hidden text-xs px-2 py-1 rounded-full bg-amber-100 text-amber-800 font-bold border border-amber-200">⏸️ إيقاف للموظف</button>
+  <!-- Inbox — Split Console -->
+  <div id="tab-inbox" class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="cyber-card p-4 flex flex-col" style="min-height:520px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
+        <h3 style="font-weight:800;color:#fff">المحادثات النشطة</h3>
+        <span id="inboxCount" style="font-size:.7rem;background:rgba(0,242,254,0.15);color:var(--cyan);border:1px solid rgba(0,242,254,0.25);padding:.15rem .5rem;border-radius:999px"></span>
       </div>
-      <div id="convMsgs" class="flex-1 space-y-2 max-h-[50vh] overflow-auto mb-2 bg-slate-50 rounded-xl p-3 border border-slate-100"></div>
-      <div class="flex gap-2">
-        <input id="replyInput" class="flex-1 field" placeholder="رد الموظف...">
-        <button id="replyBtn" class="wbtn wbtn-p">إرسال</button>
+      <div style="position:relative;margin-bottom:.75rem">
+        <input placeholder="بحث..." style="width:100%;padding:.55rem .85rem .55rem 2.2rem" class="cyber-input">
+        <span style="position:absolute;inset-inline-start:.65rem;top:50%;transform:translateY(-50%);opacity:.5">🔍</span>
+      </div>
+      <div id="convList" class="space-y-2 flex-1 overflow-auto" style="max-height:60vh"></div>
+      <div style="margin-top:.75rem;padding:.6rem;border-radius:.7rem;background:rgba(0,242,254,0.06);border:1px solid rgba(0,242,254,0.12);font-size:.7rem;color:#94a3b8">
+        <span style="color:var(--cyan)">●</span> AI Reasoning — يتم التصنيف تلقائياً (استفسار/شراء/حجز)
+      </div>
+    </div>
+    <div class="cyber-card p-4 lg:col-span-2 flex flex-col" style="min-height:520px">
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:.75rem;padding-bottom:.6rem;border-bottom:1px solid var(--line)">
+        <h3 id="convTitle" style="font-weight:800;color:#fff">اختر محادثة</h3>
+        <span style="font-size:.65rem;color:#64748b">Live • AI Generated</span>
+        <button id="takeoverBtn" class="hidden" style="margin-inline-start:auto;font-size:.7rem;font-weight:700;padding:.3rem .6rem;border-radius:999px;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3)">⏸️ إيقاف للموظف</button>
+      </div>
+      <div id="convMsgs" class="flex-1 space-y-2 overflow-auto mb-3 p-3 rounded-xl" style="max-height:52vh;background:rgba(0,0,0,0.25);border:1px solid var(--line)"></div>
+      <div style="display:flex;gap:.6rem;align-items:center">
+        <input id="replyInput" class="cyber-input flex-1" placeholder="رد الموظف...">
+        <button id="replyBtn" class="wbtn wbtn-p" style="background:linear-gradient(135deg,var(--purple),#4c1d95);border-color:rgba(121,40,202,0.4);box-shadow:0 0 15px rgba(121,40,202,0.3)">إرسال</button>
       </div>
     </div>
   </div>
 
-  <!-- Orders -->
-  <div id="tab-orders" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar"><span class="wtitle">🧾 الطلبات</span></div>
-    <div id="ordersList" class="space-y-2"></div>
+  <!-- Orders — Cyber Grid -->
+  <div id="tab-orders" class="hidden">
+    <div class="cyber-card p-4">
+      <div class="wtoolbar" style="background:transparent;border:none;padding:0;margin-bottom:.85rem">
+        <span class="wtitle" style="color:#fff">🧾 الطلبات والفواتير</span>
+        <input placeholder="بحث..." class="cyber-input" style="width:220px">
+      </div>
+      <div id="ordersList" class="space-y-2"></div>
+    </div>
   </div>
 
-  <!-- Booking -->
-  <div id="tab-booking" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar">
-      <span class="wtitle">📅 الحجوزات</span>
-      <button id="bkAdd" class="wbtn wbtn-p">＋ حجز يدوي</button>
-      <input id="bkFrom" type="text" inputmode="numeric" maxlength="10" placeholder="2026-01-01" title="من تاريخ (سنة-شهر-يوم)" class="field text-xs" style="width:7.5rem;padding:.5rem .6rem">
-      <input id="bkTo" type="text" inputmode="numeric" maxlength="10" placeholder="2026-12-31" title="إلى تاريخ (سنة-شهر-يوم)" class="field text-xs" style="width:7.5rem;padding:.5rem .6rem">
-      <button id="bkExport" class="wbtn wbtn-ok">📥 تصدير Excel</button>
-      <button id="remindBtn" class="wbtn wbtn-s">⏰ تشغيل التذكير</button>
-      <button id="bkRefresh" class="wbtn wbtn-s">↻ تحديث</button>
+  <!-- Booking — Cyber Table -->
+  <div id="tab-booking" class="hidden">
+    <div class="cyber-card p-4">
+      <div class="wtoolbar" style="background:transparent;border:none;padding:0;margin-bottom:.85rem;gap:.5rem">
+        <span class="wtitle" style="color:#fff">📅 الحجوزات</span>
+        <button id="bkAdd" class="wbtn wbtn-p">＋ حجز يدوي</button>
+        <input id="bkFrom" type="text" inputmode="numeric" maxlength="10" placeholder="2026-01-01" class="cyber-input" style="width:7.5rem;padding:.5rem .6rem;font-size:.78rem">
+        <input id="bkTo" type="text" inputmode="numeric" maxlength="10" placeholder="2026-12-31" class="cyber-input" style="width:7.5rem;padding:.5rem .6rem;font-size:.78rem">
+        <button id="bkExport" class="wbtn wbtn-s">📥 تصدير Excel</button>
+        <button id="remindBtn" class="wbtn wbtn-s">⏰ تشغيل التذكير</button>
+        <button id="bkRefresh" class="wbtn wbtn-s">↻ تحديث</button>
+      </div>
+      <div class="overflow-auto rounded-xl" style="border:1px solid var(--line);background:rgba(0,0,0,0.2)">
+        <table class="wtable" id="bookingTable">
+          <thead><tr>
+            <th>رقم الحجز</th><th>العميل</th><th>الهاتف</th><th>الخدمة</th><th>التاريخ والوقت</th><th>الحالة</th><th>إجراءات</th>
+          </tr></thead>
+          <tbody id="bookingBody"></tbody>
+        </table>
+      </div>
+      <div id="bookingList" class="hidden"></div>
     </div>
-    <div class="overflow-auto">
-      <table class="wtable" id="bookingTable">
-        <thead><tr>
-          <th>رقم الحجز</th><th>العميل</th><th>الهاتف</th><th>الخدمة</th><th>التاريخ والوقت</th><th>الحالة</th><th>إجراءات</th>
-        </tr></thead>
-        <tbody id="bookingBody"></tbody>
-      </table>
-    </div>
-    <div id="bookingList" class="hidden"></div>
-  </div>
-
-  <!-- CSAT -->
-  <div id="tab-csat" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar"><span class="wtitle">⭐ التقييمات</span></div>
-    <div id="csatStats" class="mb-3"></div>
   </div>
 
   <!-- Broadcast -->
-  <div id="tab-send" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar"><span class="wtitle">📢 بث جماعي (حد 50 رقم)</span></div>
-    <textarea id="bcText" class="field w-full mb-2" rows="3" placeholder="نص الرسالة..."></textarea>
-    <input id="bcPhones" class="field w-full mb-2" placeholder="أرقام مفصولة بفاصلة: 9627...,9627..." dir="ltr" style="text-align:right">
-    <button id="bcBtn" class="wbtn wbtn-p">📢 إرسال البث</button>
-    <div id="bcList" class="mt-3 space-y-1"></div>
+  <div id="tab-send" class="hidden">
+    <div class="cyber-card p-5">
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:1rem">
+        <span style="font-weight:800;color:#fff">📢 البث الجماعي</span>
+        <span style="font-size:.7rem;background:rgba(245,158,11,0.15);color:var(--amber);border:1px solid rgba(245,158,11,0.3);padding:.15rem .5rem;border-radius:999px">حد 50 رقم</span>
+        <span id="bcCounter" style="margin-inline-start:auto;font-family:monospace;font-size:.75rem;color:var(--cyan)">0 / 50</span>
+      </div>
+      <textarea id="bcText" class="cyber-input w-full mb-3" rows="4" placeholder="نص الرسالة..." style="resize:none"></textarea>
+      <input id="bcPhones" class="cyber-input w-full mb-3" placeholder="أرقام مفصولة بفاصلة: 9627...,9627..." dir="ltr" style="text-align:right">
+      <button id="bcBtn" class="wbtn wbtn-p" style="width:100%;justify-content:center">🚀 إرسال البث</button>
+      <div id="bcList" class="mt-4 space-y-1"></div>
+    </div>
+  </div>
+
+  <!-- CSAT -->
+  <div id="tab-csat" class="hidden">
+    <div class="cyber-card p-5">
+      <div style="display:flex;align-items:center;gap:1rem;margin-bottom:1.2rem;padding:1rem;border-radius:1rem;background:linear-gradient(135deg,rgba(234,179,8,0.12),rgba(245,158,11,0.08));border:1px solid rgba(234,179,8,0.2)">
+        <div style="font-size:2.2rem;filter:drop-shadow(0 0 8px #eab308)">⭐</div>
+        <div>
+          <div style="font-weight:800;color:#fff">التقييم العام</div>
+          <div style="font-size:.75rem;color:#a3a3a3">متوسط رضا العملاء</div>
+        </div>
+      </div>
+      <div id="csatStats"></div>
+    </div>
   </div>
 
   <!-- Report -->
-  <div id="tab-report" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar"><span class="wtitle">📊 تقرير التوفير (30 يوم)</span></div>
-    <div id="reportBox" class="space-y-2"></div>
-  </div>
-
-  <!-- CRM -->
-  <div id="tab-crm" class="hidden bg-white rounded shadow p-3">
-    <div class="wtoolbar">
-      <span class="wtitle">🧾 سجل الأحداث</span>
-      <a href="/admin/crm/export.csv" class="wbtn wbtn-s">⬇ CSV</a>
+  <div id="tab-report" class="hidden">
+    <div class="cyber-card p-5">
+      <div id="reportBox" class="space-y-3"></div>
     </div>
-    <div id="crmList" class="space-y-1 text-sm max-h-[60vh] overflow-auto"></div>
   </div>
 
-  <!-- Bots console (سوبر أدمن فقط) -->
-  <div id="tab-bots" class="hidden space-y-3">
+  <!-- CRM — Terminal -->
+  <div id="tab-crm" class="hidden">
+    <div class="terminal">
+      <div class="terminal-head">
+        <span class="term-dot r"></span><span class="term-dot y"></span><span class="term-dot g"></span>
+        <span style="margin-inline-start:.6rem;font-family:monospace;font-size:.72rem;color:#64748b">wasl — system logs</span>
+        <a href="/admin/crm/export.csv" class="wbtn wbtn-s" style="margin-inline-start:auto;font-size:.7rem;padding:.3rem .6rem">⬇ CSV</a>
+      </div>
+      <div id="crmList" class="space-y-1 text-sm p-3" style="max-height:60vh;overflow:auto;font-family:monospace;font-size:.78rem"></div>
+    </div>
+  </div>
+
+  <!-- Bots -->
+  <div id="tab-bots" class="hidden space-y-4">
     <div class="kpi-grid" id="botsKpis">
-      <div class="kpi-card kpi-blue"><div class="kpi-num" id="kpiTotal">—</div><div class="kpi-label">🤖 إجمالي البوتات</div></div>
-      <div class="kpi-card kpi-green"><div class="kpi-num" id="kpiActive">—</div><div class="kpi-label">✅ نشطة</div></div>
-      <div class="kpi-card kpi-red"><div class="kpi-num" id="kpiSuspended">—</div><div class="kpi-label">⛔ موقوفة / منتهية</div></div>
-      <div class="kpi-card kpi-amber"><div class="kpi-num" id="kpiReview">—</div><div class="kpi-label">🔍 طلبات قيد المراجعة</div></div>
-      <div class="kpi-card kpi-violet"><div class="kpi-num" id="kpiPlans">—</div><div class="kpi-label">💳 خطط مدفوعة</div></div>
+      <div class="kpi-card kpi-cyan"><div class="kpi-num" id="kpiTotal">—</div><div class="kpi-label">🤖 إجمالي البوتات</div></div>
+      <div class="kpi-card kpi-emerald"><div class="kpi-num" id="kpiActive">—</div><div class="kpi-label">✅ نشطة</div></div>
+      <div class="kpi-card kpi-pink"><div class="kpi-num" id="kpiSuspended">—</div><div class="kpi-label">⛔ موقوفة / منتهية</div></div>
+      <div class="kpi-card kpi-amber"><div class="kpi-num" id="kpiReview">—</div><div class="kpi-label">🔍 قيد المراجعة</div></div>
+      <div class="kpi-card kpi-purple"><div class="kpi-num" id="kpiPlans">—</div><div class="kpi-label">💳 خطط مدفوعة</div></div>
     </div>
-    <div class="bg-white rounded shadow p-3">
-      <div class="flex items-center gap-2 mb-3 flex-wrap">
-        <h3 class="font-bold text-lg">إدارة البوتات</h3>
-        <input id="botSearch" class="border rounded-lg px-3 py-1.5 text-sm flex-1 min-w-[10rem]" placeholder="🔎 بحث بالاسم أو المعرف...">
+    <div class="cyber-card p-4">
+      <div style="display:flex;align-items:center;gap:.6rem;margin-bottom:1rem;flex-wrap:wrap">
+        <h3 style="font-weight:800;color:#fff;font-size:1.05rem">إدارة البوتات</h3>
+        <input id="botSearch" class="cyber-input flex-1" style="min-width:180px" placeholder="🔎 بحث بالاسم أو المعرف...">
         <button id="botsRefresh" class="wbtn wbtn-s">↻ تحديث</button>
         <button id="newBotBtn" class="wbtn wbtn-p">＋ بوت جديد</button>
       </div>
@@ -371,18 +478,17 @@
     </div>
   </div>
 
-  <!-- معالج تأهيل البوت (Wizard) -->
+  <!-- Wizard -->
   <div id="botModal" class="hidden glass-overlay" style="display:none">
     <div class="wizard-card p-5" dir="rtl">
-      <h2 id="botModalTitle" class="font-bold text-lg mb-1">＋ بوت جديد</h2>
-      <p class="text-xs text-slate-500 mb-3">أكمل الخطوات الأربع لتأهيل البوت وتشغيله</p>
+      <h2 id="botModalTitle" style="font-weight:800;color:#fff;font-size:1.1rem;margin-bottom:.25rem">＋ بوت جديد</h2>
+      <p style="font-size:.75rem;color:#94a3b8;margin-bottom:1rem">أكمل الخطوات الأربع لتأهيل البوت وتشغيله</p>
       <div class="wiz-steps mb-4" id="wizSteps">
         <div class="wiz-step" data-s="0"><div class="dot">1</div>الهوية</div>
         <div class="wiz-step" data-s="1"><div class="dot">2</div>واتساب</div>
         <div class="wiz-step" data-s="2"><div class="dot">3</div>الدفع</div>
         <div class="wiz-step" data-s="3"><div class="dot">4</div>الخطة</div>
       </div>
-      <!-- Step 1: identity -->
       <div class="wiz-pane space-y-2" data-pane="0">
         <input id="botId" class="field" placeholder="المعرف (انجليزي صغير: clinic-noor)">
         <input id="botNameFull" class="field" placeholder="اسم النشاط (عيادة النور)">
@@ -397,29 +503,25 @@
           <option value="farm">🚜 مزرعة</option>
           <option value="general">📦 عام</option>
         </datalist>
-        <label class="flex items-center gap-2 text-sm"><input id="botBooking" type="checkbox"> 📅 تفعيل الحجوزات والمواعيد لهذا البوت</label>
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#cbd5e1"><input id="botBooking" type="checkbox"> 📅 تفعيل الحجوزات والمواعيد لهذا البوت</label>
       </div>
-      <!-- Step 2: whatsapp -->
       <div class="wiz-pane space-y-2 hidden" data-pane="1">
         <input id="botPhoneId" class="field" placeholder="WhatsApp Phone ID" dir="ltr">
         <input id="botVerify" class="field" placeholder="Verify Token" dir="ltr">
         <input id="botToken" type="password" class="field" placeholder="WhatsApp Token الخاص" dir="ltr">
-        <p class="text-xs text-slate-500">💡 اترك الحقول فارغة لاستخدام إعدادات السيرفر المشتركة. التوكن يُشفّر بـ AES-GCM ولا يظهر مجدداً.<br>📱 نفس رقم العميل يبقى على تطبيق واتساب بزنس (وضع Coexistence) — التفاصيل بزر 🔗 ربط بعد الإنشاء.</p>
+        <p style="font-size:.72rem;color:#94a3b8">💡 اترك الحقول فارغة لاستخدام إعدادات السيرفر المشتركة. التوكن يُشفّر بـ AES-GCM ولا يظهر مجدداً.<br>📱 نفس رقم العميل يبقى على تطبيق واتساب بزنس (وضع Coexistence) — التفاصيل بزر 🔗 ربط بعد الإنشاء.</p>
       </div>
-      <!-- Step 3: payments -->
       <div class="wiz-pane space-y-2 hidden" data-pane="2">
-        <div class="flex gap-2">
+        <div style="display:flex;gap:.5rem">
           <input id="botCliqNum" class="field flex-1" placeholder="رقم CliQ" dir="ltr">
           <input id="botCliqName" class="field flex-1" placeholder="اسم CliQ">
         </div>
         <textarea id="botWallets" class="field" rows="3" placeholder="محافظ إضافية (سطر لكل محفظة: النوع | الرقم | الاسم)"></textarea>
         <input id="botStaff" class="field" dir="ltr" placeholder="📲 رقم الطاقم للتنبيهات (واتساب المالك)">
-        <p class="text-xs text-slate-500">💡 تنبيهات الحجز/الدفع/التصعيد توصله واتساب فوراً.</p>
-        <p class="text-xs text-slate-500">💡 الإيصالات تُتحقق تلقائياً بالذكاء الاصطناعي عند إرسال لقطة الشاشة.</p>
+        <p style="font-size:.72rem;color:#94a3b8">💡 تنبيهات الحجز/الدفع/التصعيد توصله واتساب فوراً.</p>
       </div>
-      <!-- Step 4: plan & review -->
       <div class="wiz-pane space-y-2 hidden" data-pane="3">
-        <div class="flex gap-2">
+        <div style="display:flex;gap:.5rem">
           <select id="botPlan" class="field flex-1">
             <option value="trial">تجريبي trial (14 يوم)</option>
             <option value="basic">أساسي basic</option>
@@ -428,11 +530,11 @@
           </select>
           <input id="botTrial" type="date" class="field flex-1" title="نهاية التجربة">
         </div>
-        <label class="flex items-center gap-2 text-sm"><input id="botEnabled" type="checkbox" checked> مفعّل فوراً</label>
-        <div id="botReview" class="text-xs bg-slate-50 border rounded-lg p-2 space-y-0.5"></div>
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.85rem;color:#cbd5e1"><input id="botEnabled" type="checkbox" checked> مفعّل فوراً</label>
+        <div id="botReview" style="font-size:.75rem;background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:.7rem;padding:.6rem"></div>
       </div>
-      <div id="botMsg" class="text-xs text-red-500 min-h-[1rem] mt-2"></div>
-      <div class="flex gap-2 mt-2">
+      <div id="botMsg" style="font-size:.75rem;color:var(--pink);min-height:1rem;margin-top:.5rem"></div>
+      <div style="display:flex;gap:.5rem;margin-top:.75rem">
         <button id="botBack" class="wbtn wbtn-s flex-1">رجوع</button>
         <button id="botNext" class="wbtn wbtn-p flex-1">التالي</button>
         <button id="botSave" class="wbtn wbtn-ok flex-1 hidden">✓ إنشاء البوت</button>
@@ -441,54 +543,52 @@
     </div>
   </div>
 
-  <!-- نافذة ربط العميل: فحص الربط + دليل Coexistence + دعوة واتساب -->
   <div id="linkModal" class="hidden glass-overlay" style="display:none">
     <div class="wizard-card p-5" dir="rtl">
-      <h2 class="font-bold text-lg mb-1">🔗 ربط العميل — <span id="linkBotName"></span></h2>
-      <p class="text-xs text-slate-500 mb-3">نفس رقم الواتساب يبقى على تطبيق العميل ويتربط بالمنصة (وضع Coexistence).</p>
-      <div class="flex items-center gap-2 mb-2">
+      <h2 style="font-weight:800;color:#fff;margin-bottom:.25rem">🔗 ربط العميل — <span id="linkBotName"></span></h2>
+      <p style="font-size:.72rem;color:#94a3b8;margin-bottom:.75rem">نفس رقم الواتساب يبقى على تطبيق العميل ويتربط بالمنصة (وضع Coexistence).</p>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
         <button id="linkTestBtn" class="wbtn wbtn-p">📡 فحص الربط الحي</button>
-        <span id="linkStatus" class="text-xs text-slate-500">لم يُفحص بعد</span>
+        <span id="linkStatus" style="font-size:.72rem;color:#94a3b8">لم يُفحص بعد</span>
       </div>
-      <button id="linkCoexBtn" class="wbtn wbtn-ok w-full mb-2">🟩 ربط تعايش: رقم العميل بضل على تلفونه + البوت (موصى به — دقيقتان)</button>
-      <button id="linkMetaBtn" class="wbtn wbtn-s w-full mb-2">🟦 ترحيل كامل للرقم (ينقطع عن التلفون — للحالات الخاصة)</button>
-      <button id="linkUnlinkBtn" class="wbtn w-full mb-2" style="background:#fee2e2;color:#b91c1c">🗑 إلغاء الربط الحالي (لفك ربط خاطئ والبدء من جديد)</button>
-      <ol class="text-xs text-slate-600 space-y-1 mb-3 list-decimal pr-4">
-        <li>العميل يُبقي رقم <b>واتساب بزنس</b> على هاتفه (لا يحذف شيئاً).</li>
-        <li>يربط الرقم عبر Meta (Coexistence) ويعطيك <b>Phone ID</b> و <b>Token</b>.</li>
+      <button id="linkCoexBtn" class="wbtn wbtn-ok" style="width:100%;margin-bottom:.4rem">🟩 ربط تعايش: رقم العميل بضل على تلفونه + البوت (موصى به — دقيقتان)</button>
+      <button id="linkMetaBtn" class="wbtn wbtn-s" style="width:100%;margin-bottom:.4rem">🟦 ترحيل كامل للرقم (ينقطع عن التلفون — للحالات الخاصة)</button>
+      <button id="linkUnlinkBtn" class="wbtn" style="width:100%;margin-bottom:.6rem;background:rgba(255,0,128,0.12);color:var(--pink);border-color:rgba(255,0,128,0.25)">🗑 إلغاء الربط الحالي</button>
+      <ol style="font-size:.72rem;color:#94a3b8;list-style:decimal;padding-inline-start:1.1rem;margin-bottom:.75rem;display:flex;flex-direction:column;gap:.2rem">
+        <li>العميل يُبقي رقم <b style="color:#e2e8f0">واتساب بزنس</b> على هاتفه.</li>
+        <li>يربط الرقم عبر Meta ويعطيك <b style="color:#e2e8f0">Phone ID</b> و <b style="color:#e2e8f0">Token</b>.</li>
         <li>الصقهما من زر ✏ تعديل ثم اضغط فحص الربط الحي هنا.</li>
-        <li>أنشئ دعوة بالأسفل — العميل يستلم رابط + كلمة مؤقتة واتساب.</li>
+        <li>أنشئ دعوة — العميل يستلم رابط + كلمة مؤقتة واتساب.</li>
       </ol>
-      <div class="border-t pt-2 space-y-2">
-        <div class="font-bold text-sm">✉ دعوة بوابة العميل</div>
-        <div class="flex gap-2">
+      <div style="border-top:1px solid var(--line);padding-top:.6rem;display:flex;flex-direction:column;gap:.5rem">
+        <div style="font-weight:700;font-size:.85rem;color:#fff">✉ دعوة بوابة العميل</div>
+        <div style="display:flex;gap:.4rem">
           <input id="linkName" class="field flex-1" placeholder="اسم العميل (العيادة)">
           <input id="linkPhone" class="field flex-1" placeholder="جوال العميل" dir="ltr">
         </div>
-        <button id="linkInviteBtn" class="wbtn wbtn-ok w-full">إنشاء + إرسال الدعوة واتساب</button>
-        <div id="linkResult" class="text-xs bg-slate-50 border rounded-lg p-2 space-y-0.5 hidden"></div>
+        <button id="linkInviteBtn" class="wbtn wbtn-ok" style="width:100%">إنشاء + إرسال الدعوة واتساب</button>
+        <div id="linkResult" style="font-size:.72rem;background:rgba(255,255,255,0.04);border:1px solid var(--line);border-radius:.7rem;padding:.6rem;display:none"></div>
       </div>
-      <div class="flex gap-2 mt-3">
+      <div style="display:flex;gap:.5rem;margin-top:.75rem">
         <button id="linkClose" class="wbtn wbtn-s flex-1">إغلاق</button>
       </div>
     </div>
   </div>
 
-  <!-- نافذة منظور العميل: البوابة كما يراها العميل تماماً (عروض تقديمية) -->
   <div id="previewModal" class="hidden glass-overlay" style="display:none">
     <div class="wizard-card p-4" dir="rtl" style="width:64rem">
-      <div class="flex items-center gap-2 mb-2">
-        <h2 class="font-bold text-base">👁 منظور العميل — <span id="previewName"></span></h2>
-        <a id="previewOpen" href="#" target="_blank" class="wbtn wbtn-s mr-auto">فتح بتبويب ↗</a>
+      <div style="display:flex;align-items:center;gap:.5rem;margin-bottom:.6rem">
+        <h2 style="font-weight:700;color:#fff">👁 منظور العميل — <span id="previewName"></span></h2>
+        <a id="previewOpen" href="#" target="_blank" class="wbtn wbtn-s" style="margin-inline-start:auto">فتح بتبويب ↗</a>
         <button id="previewClose" class="wbtn wbtn-s">✕</button>
       </div>
-      <p class="text-xs text-slate-500 mb-2">رابط مؤقت 10 دقائق بنفس صلاحيات العميل وعزله الكامل — آمن للعرض أمام العملاء.</p>
-      <iframe id="previewFrame" title="معاينة بوابة العميل" style="width:100%;height:70vh;border:1px solid #e2e8f0;border-radius:.8rem;background:#fff"></iframe>
+      <p style="font-size:.72rem;color:#94a3b8;margin-bottom:.5rem">رابط مؤقت 10 دقائق بنفس صلاحيات العميل وعزله الكامل — آمن للعرض أمام العملاء.</p>
+      <iframe id="previewFrame" title="معاينة بوابة العميل" style="width:100%;height:70vh;border:1px solid var(--line);border-radius:.8rem;background:#fff"></iframe>
     </div>
   </div>
   </main>
 </div>
-
+<script>
 <script>
 const $ = (id) => document.getElementById(id);
 // XSS guard: escape all server-controlled strings before injecting into HTML.
