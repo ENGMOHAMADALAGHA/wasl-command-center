@@ -75,6 +75,11 @@ export function registerTenantRoutes(app) {
     }
     const t = await getTenantFull(req.params.id);
     if (!t) return res.status(404).json({ ok: false, error: "tenant غير موجود" });
+    // A-فخ: بلا بيانات خاصة لا نفحص المشتركة — فحصها يعرض "مربوط" كاذباً على بوت فاضي.
+    // حالة كل بوت = بياناته الخاصة فقط (المشتركة للتشغيل المؤقت، لا تُقاس عليها الحالة).
+    if (!t.phoneNumberId || !t.whatsappToken) {
+      return res.json({ ok: false, linked: false, reason: "لا توجد بيانات ربط خاصة — اربط هذا البوت برقمه أولاً (المشتركة لا تُحتسب)" });
+    }
     const token = t.whatsapp_token;
     const phoneId = t.phone_number_id;
     if (!token || !phoneId) {
