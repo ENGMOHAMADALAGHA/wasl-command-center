@@ -285,3 +285,17 @@ test("channels/send: التوجيه حسب القناة + رفض opt-out", async
   };
   await assert.rejects(sendChText(waCtx, "x"), /simulated-no-credentials/);
 });
+
+test("ui: سكربتات admin.html و client.html سليمة الصياغة (تمنع موت كل الأزرار)", async () => {
+  const { readFileSync } = await import("node:fs");
+  const { default: vm } = await import("node:vm");
+  for (const f of ["admin.html", "client.html"]) {
+    const h = readFileSync(new URL("../" + f, import.meta.url), "utf8");
+    const blocks = h.split("<script>").slice(1).map((p) => p.split("</scr" + "ipt>")[0]);
+    assert.ok(blocks.length >= 1, f + ": لا سكربت داخلي");
+    for (const code of blocks) {
+      if (!code.trim()) continue;
+      new vm.Script(code, { filename: f }); // يرمي عند أي خطأ صياغي — بلا تنفيذ
+    }
+  }
+});
