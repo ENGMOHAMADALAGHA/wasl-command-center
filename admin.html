@@ -1686,6 +1686,16 @@ async function onboardViaMeta(mode = "full") {
     if (coex) { toast("كونفج التعايش غير مضبوط — أضف META_EMBEDDED_CONFIG_ID_COEX بالبيئة (أو استخدم الترحيل الكامل مؤقتاً)", "error"); return; }
     toast("الكونفج غير مضبوط بالبيئة", "error"); return;
   }
+  // تتبع تشخيصي (بلا أسرار): كل مرحلة تُسجل بالخادم لتشخيص انقطاع النافذة
+  const crumb = (stage, info) => {
+    try {
+      api("/admin/onboard/debug", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tenantId: linkTenantId, stage, info }),
+      }).catch(() => {});
+    } catch { /* صامت */ }
+  };
+  crumb("popup-open", "mode=" + (coex ? "coex" : "full"));
   try { await loadFbSdk(cfg.appId); } catch (e) { toast(e.message, "error"); return; }
   $("linkStatus").textContent = "بانتظار إتمام الربط بنافذة Meta... (إذا ما فتحت نافذة: اسمح بالنوافذ المنبثقة من أيقونة المتصفح ثم اضغط الزر مرة ثانية)";
   let fbDone = false;
@@ -1700,6 +1710,9 @@ async function onboardViaMeta(mode = "full") {
     fbDone = true;
     clearTimeout(fbWatch);
     try {
+      crumb("callback", "status=" + (resp?.status || "none") + " hasCode=" + (!!resp?.authResponse?.code) + " hasPhone=" + (!!resp?.authResponse?.phone_number_id));
+    } catch { /* صامت */ }
+    try {
       if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("linkStatus").textContent = "أُلغي الربط"; return; }
       const ar = resp.authResponse;
       if (!ar.phone_number_id) { toast("لم يرجع رقم من Meta — أكمل كل خطوات النافذة", "error"); return; }
@@ -1709,11 +1722,13 @@ async function onboardViaMeta(mode = "full") {
         body: JSON.stringify({ tenantId: linkTenantId, code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id, mode: coex ? "coexistence" : "full" }),
       });
       if (j.linked) {
+        try { crumb("exchange-ok", "mode=" + (j.mode || "?")); } catch { /* صامت */ }
         $("linkStatus").textContent = "✅ مربوط عبر Meta" + (j.mode === "coexistence" ? " (تعايش)" : "") + (j.number ? " (" + j.number + ")" : "");
         $("linkStatus").className = "text-xs font-bold text-green-700";
         toast("تم الربط عبر Meta ✅" + (j.mode === "coexistence" ? " (تعايش)" : ""), "success");
       } else { throw new Error(j.error || "فشل التثبيت"); }
     } catch (e) {
+      try { crumb("exchange-fail", String(e?.message || e).slice(0, 150)); } catch { /* صامت */ }
       $("linkStatus").textContent = "❌ " + e.message;
       $("linkStatus").className = "text-xs font-bold text-red-600";
     }

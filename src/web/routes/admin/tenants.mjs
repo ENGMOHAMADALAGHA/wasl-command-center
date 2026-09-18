@@ -102,13 +102,35 @@ export function registerTenantRoutes(app) {
       res.json({ ok: false, linked: false, reason: e.message });
     }
   });
+  // ── تتبع تشخيصي لخطوات الربط (breadcrumbs بلا أسرار — لتشخيص انقطاع النافذة) ──
+  app.post("/admin/onboard/debug", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false });
+    try {
+      const { storeGet, storeSet } = await import("../../../../store.mjs");
+      const { tenantId, stage, info } = req.body || {};
+      if (!tenantId || !stage) return res.status(400).json({ ok: false });
+      const key = `onboard_dbg:${tenantId}`;
+      const list = (await storeGet(key).catch(() => null)) || [];
+      list.push({ at: Date.now(), stage: String(stage).slice(0, 40), info: String(info || "").slice(0, 200) });
+      await storeSet(key, list.slice(-20), 24 * 60 * 60 * 1000).catch(() => {});
+      res.json({ ok: true });
+    } catch { res.json({ ok: false }); }
+  });
+  app.get("/admin/onboard/debug", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false });
+    try {
+      const { storeGet } = await import("../../../../store.mjs");
+      const tenantId = req.query.tenant;
+      if (!tenantId) return res.status(400).json({ ok: false });
+      res.json({ ok: true, crumbs: (await storeGet(`onboard_dbg:${tenantId}`).catch(() => null)) || [] });
+    } catch { res.json({ ok: false }); }
+  });
   // ── Embedded Signup: إعداد علني + تبادل الكود (onboarding ذاتي بدقيقتين) ──
   // الزر بلوحة الإدارة يفتح نافذة Meta، والعميل يربط رقمه بنفسه: دخول → محفظة →
   // WABA → رقم → صلاحيات. الكود صلاحيته ~60 ثانية ويُبادل server-side فقط.
   // المتطلب المسبق بلوحة Meta (مرة واحدة): منتج Facebook Login for Business +
   // Configuration ID بالصلاحيات + Allowed Domains (وإلا enabled=false بزر معطل مبرر).
-  app.get("/admin/onboard/config", async (req, res) => {
-    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+  app.get("/admin/onboard/config", async (req, res) => {    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
     const { META_APP_ID, META_EMBEDDED_CONFIG_ID, META_EMBEDDED_CONFIG_ID_COEX } = await import("../../../config/env.mjs");
     res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null, coexConfigId: META_EMBEDDED_CONFIG_ID_COEX || null, coexEnabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID_COEX) });
   });
