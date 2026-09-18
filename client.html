@@ -78,6 +78,7 @@
       <button data-t="orders" class="tabbtn">🧾 الطلبات</button>
       <button data-t="booking" class="tabbtn">📅 الحجوزات</button>
       <button data-t="ratings" class="tabbtn">⭐ التقييمات</button>
+      <button data-t="link" class="tabbtn" id="linkTabBtn">🔗 ربط واتساب</button>
     </div>
     <div id="pane-inbox" class="grid grid-cols-1 md:grid-cols-3 gap-4">
       <div class="card p-3">
@@ -117,6 +118,13 @@
       </div>
     </div>
     <div id="pane-ratings" class="hidden card p-3"><div class="wtoolbar"><span class="wtitle">⭐ التقييمات</span></div><div id="cRatings"></div></div>
+    <div id="pane-link" class="hidden card p-4 space-y-2">
+      <div class="wtoolbar"><span class="wtitle">🔗 ربط رقم واتسابك</span></div>
+      <p class="text-xs text-slate-500">اربط رقمك بنفسك بدقيقتين عبر نافذة Meta — رقمك بضل على تلفونك (تعايش) أو اختر الترحيل الكامل.</p>
+      <div id="cLinkStatus" class="text-xs text-slate-500">اختر طريقة الربط بالأسفل</div>
+      <button id="cLinkCoex" class="btn-p w-full">🟩 ربط تعايش (موصى به)</button>
+      <button id="cLinkFull" class="btn-s w-full">🟦 ترحيل كامل للرقم</button>
+    </div>
   </div>
 </div>
 <div id="toastBox" style="position:fixed;bottom:1rem;inset-inline:0;display:flex;flex-direction:column;align-items:center;gap:.4rem;z-index:100;pointer-events:none"></div>
@@ -237,7 +245,7 @@ document.querySelectorAll("#ctabs button").forEach((b) => {
   b.onclick = () => {
     document.querySelectorAll("#ctabs button").forEach((x) => x.classList.remove("on"));
     b.classList.add("on");
-    ["inbox", "orders", "booking", "ratings"].forEach((t) => $("pane-" + t).classList.add("hidden"));
+    ["inbox", "orders", "booking", "ratings", "link"].forEach((t) => $("pane-" + t).classList.add("hidden"));
     $("pane-" + b.dataset.t).classList.remove("hidden");
   };
 });
@@ -518,6 +526,58 @@ function refreshAll() {
   loadReport(); loadInbox(); loadOrders(); loadBooking(); loadRatings();
   if (cur.phone) loadConv();
 }
+
+// ── ربط العميل برقمه من بوابته (مقفل على بوته server-side — بلا وصول للإدارة) ──
+let fbSdkPromise = null;
+function loadFbSdk(appId) {
+  if (window.FB) return Promise.resolve();
+  if (fbSdkPromise) return fbSdkPromise;
+  fbSdkPromise = new Promise((resolve, reject) => {
+    window.fbAsyncInit = function () {
+      try { FB.init({ appId, autoLogAppEvents: true, xfbml: false, version: "v21.0" }); resolve(); }
+      catch (e) { reject(e); }
+    };
+    const s = document.createElement("script");
+    s.src = "https://connect.facebook.net/en_US/sdk.js";
+    s.onerror = () => reject(new Error("تعذر تحميل FB SDK"));
+    document.head.appendChild(s);
+    setTimeout(() => reject(new Error("مهلة تحميل FB SDK")), 20000);
+  });
+  return fbSdkPromise;
+}
+async function onboardClient(mode) {
+  const coex = mode === "coexistence";
+  $("cLinkStatus").textContent = "جاري تجهيز ربط Meta...";
+  let cfg;
+  try {
+    cfg = await api("/admin/onboard/config");
+  } catch (e) { toast("تعذر جلب إعدادات الربط", "error"); return; }
+  if (!cfg.enabled) { toast("الربط غير مفعل بعد — تواصل مع الإدارة", "error"); return; }
+  const cid = coex ? (cfg.coexConfigId || null) : (cfg.configId || null);
+  if (!cid) { toast(coex ? "ربط التعايش غير مفعل بعد — تواصل مع الإدارة" : "الربط غير مفعل", "error"); return; }
+  try { await loadFbSdk(cfg.appId); } catch (e) { toast(e.message, "error"); return; }
+  $("cLinkStatus").textContent = "بانتظار إتمام الربط بنافذة Meta... (اسمح بالنوافذ المنبثقة إن لم تفتح)";
+  FB.login(async function (resp) {
+    try {
+      if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("cLinkStatus").textContent = "أُلغي الربط"; return; }
+      const ar = resp.authResponse;
+      if (!ar.phone_number_id) { toast("لم يرجع رقم من Meta — أكمل كل خطوات النافذة", "error"); return; }
+      $("cLinkStatus").textContent = "جاري تثبيت الربط...";
+      const j = await api("/admin/onboard/client-exchange", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id, mode: coex ? "coexistence" : "full" }),
+      });
+      if (j.linked) {
+        $("cLinkStatus").textContent = "✅ مربوط وشغال" + (j.number ? " (" + j.number + ")" : "");
+        toast("تم ربط رقمك بنجاح ✅", "success");
+      } else { throw new Error(j.error || "فشل التثبيت"); }
+    } catch (e) {
+      $("cLinkStatus").textContent = "❌ " + e.message;
+    }
+  }, { config_id: cid, response_type: "code", override_default_response_type: true, scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/portal/", extras: { sessionInfoVersion: "3" } });
+}
+$("cLinkCoex").onclick = () => onboardClient("coexistence");
+$("cLinkFull").onclick = () => onboardClient("full");
 (function boot() {
   let previewMode = false;
   try {
@@ -537,6 +597,9 @@ function refreshAll() {
     badge.style.cssText = "position:fixed;top:.6rem;inset-inline:0;margin-inline:auto;width:fit-content;background:#7c3aed;color:#fff;font-size:.72rem;font-weight:800;padding:.3rem .9rem;border-radius:999px;z-index:200;box-shadow:0 8px 20px -6px rgba(0,0,0,.4)";
     badge.textContent = "👁 وضع المعاينة — كما يراه العميل (10 دقائق)";
     document.body.appendChild(badge);
+    // المعاينة للفرجة فقط — زر الربط الحقيقي مخفي (الخادم يرفضه أيضاً)
+    const lt = document.getElementById("linkTabBtn");
+    if (lt) lt.style.display = "none";
   }
   if (token && tenantFromToken()) enter();
   setInterval(() => { if (token && !document.hidden) { loadInbox(); if (cur.phone) loadConv(); } }, 8000);

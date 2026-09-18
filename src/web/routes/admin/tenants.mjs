@@ -130,16 +130,17 @@ export function registerTenantRoutes(app) {
   // WABA → رقم → صلاحيات. الكود صلاحيته ~60 ثانية ويُبادل server-side فقط.
   // المتطلب المسبق بلوحة Meta (مرة واحدة): منتج Facebook Login for Business +
   // Configuration ID بالصلاحيات + Allowed Domains (وإلا enabled=false بزر معطل مبرر).
-  app.get("/admin/onboard/config", async (req, res) => {    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+  app.get("/admin/onboard/config", async (req, res) => {
+    // مسموح للسوبر + العميل (JWT مقفل على بوته): المعرفات علنية بالتصميم (تُضمن بزر الربط)
+    if (!req.isSuperAdmin && !req.clientTenant) return res.status(403).json({ ok: false, error: "غير مصرح" });
     const { META_APP_ID, META_EMBEDDED_CONFIG_ID, META_EMBEDDED_CONFIG_ID_COEX } = await import("../../../config/env.mjs");
     res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null, coexConfigId: META_EMBEDDED_CONFIG_ID_COEX || null, coexEnabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID_COEX) });
   });
-  app.post("/admin/onboard/exchange", async (req, res) => {
-    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
-    const { tenantId, code, waba_id, phone_number_id, mode } = req.body || {};
+  // منطق التبادل المشترك: السوبر يمرر أي tenantId، والعميل يُقفل على بوته فقط
+  async function runOnboardExchange({ tenantId, code, waba_id, phone_number_id, mode }) {
     const onboardingMode = mode === "coexistence" ? "coexistence" : "full";
     if (!tenantId || !code || !phone_number_id) {
-      return res.status(400).json({ ok: false, error: "tenantId و code و phone_number_id مطلوبة" });
+      return { http: 400, json: { ok: false, error: "tenantId و code و phone_number_id مطلوبة" } };
     }
     try {
       const { META_APP_ID, META_APP_SECRET } = await import("../../../config/env.mjs");
@@ -170,9 +171,9 @@ export function registerTenantRoutes(app) {
         } catch { /* عرض فقط */ }
         // 4) ربط البوت: هوية الرقم + التوكن المشفر (تفرد إجباري يمنع الخلط)
         // + بصمة وضع الربط: التعايش يحتاجها لاحقاً (كشف الصدى/السجل القديم)
-        const { updateTenant } = await import("../../../../tenants.mjs");
-        const { getTenantFull: getFull } = await import("../../../../tenants.mjs");
+        const { updateTenant, getTenantFull: getFull } = await import("../../../../tenants.mjs");
         const prev = await getFull(tenantId).catch(() => null);
+        if (!prev) return { http: 404, json: { ok: false, error: "البوت غير موجود" } };
         const prevFeatures = (prev && typeof prev.features === "object" && prev.features) || {};
         await updateTenant(tenantId, {
           phoneNumberId: String(phone_number_id),
@@ -181,14 +182,41 @@ export function registerTenantRoutes(app) {
         });
         logEvent("onboard_exchange", { tenantId, waba: waba_id || null, number, mode: onboardingMode }).catch(() => {});
         // التوكن لا يغادر الخادم أبداً — الرد هوية وتأكيد فقط
-        res.json({ ok: true, linked: true, number, name: vname, mode: onboardingMode });
+        return { http: 200, json: { ok: true, linked: true, number, name: vname, mode: onboardingMode } };
       } finally {
         clearTimeout(timer);
       }
     } catch (e) {
       logEvent("onboard_failed", { tenantId, error: String(e?.message || e).slice(0, 200) }).catch(() => {});
-      res.status(400).json({ ok: false, error: e.message });
+      return { http: 400, json: { ok: false, error: e.message } };
     }
+  }
+  app.post("/admin/onboard/exchange", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+    const out = await runOnboardExchange(req.body || {});
+    res.status(out.http).json(out.json);
+  });
+  // ربط العميل برقمه من بوابته: مقفل على بوته فقط (JWT)، مع حد معدل ضد إساءة تبادل الأكواد
+  app.post("/admin/onboard/client-exchange", async (req, res) => {
+    const tenantId = req.clientTenant;
+    if (!tenantId) return res.status(403).json({ ok: false, error: "دخول العميل فقط — سجل دخولك ببوابتك" });
+    // توكن المعاينة (عروض السوبر) للفرجة فقط — ممنوع يربط أرقاماً حقيقية
+    try {
+      const { verifyClientToken } = await import("../../../../portal.mjs");
+      const p = verifyClientToken((req.headers.authorization || "").split(" ")[1] || "");
+      if (!p || p.preview) return res.status(403).json({ ok: false, error: "وضع المعاينة للعرض فقط" });
+    } catch { return res.status(403).json({ ok: false }); }
+    try {
+      const { checkLimit } = await import("../../../security/rateLimit.mjs");
+      const rl = checkLimit(`onboard:${tenantId}`, 5, 60 * 1000);
+      if (!rl.allowed) return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${rl.retryAfter} ثانية` });
+    } catch { /* بلا حد = أكمل */ }
+    const { isTenantActive } = await import("../../../../tenants.mjs");
+    const { getTenantFull } = await import("../../../../tenants.mjs");
+    const t = await getTenantFull(tenantId).catch(() => null);
+    if (!t || !isTenantActive(t)) return res.status(403).json({ ok: false, error: "هذا البوت موقوف أو منتهي التجربة" });
+    const out = await runOnboardExchange({ ...(req.body || {}), tenantId });
+    res.status(out.http).json(out.json);
   });
   // دعوة عميل: إنشاء حساب بوابة + كلمة مؤقتة + رابط دخول + إرسال واتساب اختياري
   app.post("/admin/invites", async (req, res) => {
