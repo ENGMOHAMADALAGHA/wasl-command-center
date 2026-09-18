@@ -1743,38 +1743,7 @@ async function submitExchange(payload) {
     renderPickList(payload.tenantId, payload.mode, j.handle, j.candidates);
     return;
   }
-  if (j.needWaba && j.handle) {
-    renderWabaInput(payload.tenantId, payload.mode, j.handle);
-    return;
-  }
   throw new Error(j.error || "فشل التثبيت");
-}
-// تعذر السرد التلقائي؟ معرف حساب الواتساب (ظاهر بلوحة ميتا) يكفي لإتمام الربط
-function renderWabaInput(tenantId, mode, handle) {
-  $("linkStatus").textContent = "خطوة أخيرة: الصق WhatsApp Business Account ID من لوحة ميتا (إعدادات النشاط > حسابات واتساب):";
-  $("linkStatus").className = "text-xs font-bold text-slate-700";
-  const box = $("linkResult");
-  box.classList.remove("hidden");
-  box.innerHTML = "";
-  const inp = document.createElement("input");
-  inp.className = "field w-full mb-2";
-  inp.placeholder = "مثال: 28165557906447191";
-  inp.dir = "ltr";
-  const btn = document.createElement("button");
-  btn.className = "wbtn wbtn-ok w-full";
-  btn.textContent = "إتمام الربط بهذا الحساب";
-  btn.onclick = async () => {
-    const waba = inp.value.trim();
-    if (!/^\d{8,25}$/.test(waba)) { toast("معرف غير صالح — أرقام فقط", "error"); return; }
-    $("linkStatus").textContent = "جاري تثبيت الربط...";
-    try {
-      await submitExchange({ tenantId, handle, waba_id: waba, mode });
-    } catch (e) {
-      $("linkStatus").textContent = "❌ " + e.message;
-      $("linkStatus").className = "text-xs font-bold text-red-600";
-    }
-  };
-  box.append(inp, btn);
 }
 // عدة أرقام على الحساب؟ اعرض اختياراً — التأكيد يكمل بنفس الجلسة المحفوظة server-side
 function renderPickList(tenantId, mode, handle, candidates) {

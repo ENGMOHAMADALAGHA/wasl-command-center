@@ -589,32 +589,6 @@ async function submitClientExchange(payload) {
     renderClientPick(payload.mode, j.handle, j.candidates);
     return;
   }
-  if (j.needWaba && j.handle) {
-    $("cLinkStatus").textContent = "خطوة أخيرة: الصق WhatsApp Business Account ID من لوحة ميتا:";
-    let inp = $("cWabaInp");
-    if (!inp) {
-      inp = document.createElement("input");
-      inp.id = "cWabaInp";
-      inp.className = "field w-full";
-      inp.placeholder = "مثال: 28165557906447191";
-      inp.dir = "ltr";
-      const btn = document.createElement("button");
-      btn.className = "btn-p w-full";
-      btn.textContent = "إتمام الربط";
-      btn.onclick = async () => {
-        const waba = ($("cWabaInp").value || "").trim();
-        if (!/^\d{8,25}$/.test(waba)) { toast("معرف غير صالح", "error"); return; }
-        $("cLinkStatus").textContent = "جاري تثبيت الربط...";
-        try {
-          await submitClientExchange({ handle: inp._handle, waba_id: waba, mode: inp._mode });
-        } catch (e) { $("cLinkStatus").textContent = "❌ " + e.message; }
-      };
-      $("cLinkStatus").after(inp, btn);
-    }
-    inp._handle = j.handle;
-    inp._mode = payload.mode;
-    return;
-  }
   throw new Error(j.error || "فشل التثبيت");
 }
 function renderClientPick(mode, handle, candidates) {
