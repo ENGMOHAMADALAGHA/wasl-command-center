@@ -124,6 +124,7 @@
       <div id="cLinkStatus" class="text-xs text-slate-500">اختر طريقة الربط بالأسفل</div>
       <button id="cLinkCoex" class="btn-p w-full">🟩 ربط تعايش (موصى به)</button>
       <button id="cLinkFull" class="btn-s w-full">🟦 ترحيل كامل للرقم</button>
+      <button id="cLinkUnlink" class="btn-s w-full" style="color:#b91c1c">🗑 إلغاء الربط الحالي</button>
     </div>
   </div>
 </div>
@@ -578,6 +579,17 @@ async function onboardClient(mode) {
 }
 $("cLinkCoex").onclick = () => onboardClient("coexistence");
 $("cLinkFull").onclick = () => onboardClient("full");
+$("cLinkUnlink").onclick = async () => {
+  if (!confirm("إلغاء ربط رقمك؟ (بتقدر تربط من جديد بعدها)")) return;
+  $("cLinkStatus").textContent = "جاري إلغاء الربط...";
+  try {
+    const j = await api("/admin/onboard/client-unlink", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+    if (j.unlinked) {
+      $("cLinkStatus").textContent = "تم إلغاء الربط ✅ اربط من جديد";
+      toast("انفك الربط", "success");
+    } else { throw new Error(j.error || "فشل الإلغاء"); }
+  } catch (e) { $("cLinkStatus").textContent = "❌ " + e.message; }
+};
 (function boot() {
   let previewMode = false;
   try {

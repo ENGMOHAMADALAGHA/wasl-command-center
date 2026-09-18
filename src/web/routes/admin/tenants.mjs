@@ -102,7 +102,35 @@ export function registerTenantRoutes(app) {
       res.json({ ok: false, linked: false, reason: e.message });
     }
   });
-  // ── تتبع تشخيصي لخطوات الربط (breadcrumbs بلا أسرار — لتشخيص انقطاع النافذة) ──
+  // ── إلغاء الربط: مسح هوية الرقم + التوكن + بصمة الوضع (إعادة نظيفة لربط جديد) ──
+  // ملاحظة: يمسح جهة وصل فقط — الفصل الكامل من طرف Meta يتم من تطبيق الواتساب
+  // (الإعدادات > الحساب > منصات الأعمال > قطع الاتصال) عند الحاجة.
+  async function runOnboardUnlink(tenantId) {
+    const { updateTenant, getTenantFull } = await import("../../../../tenants.mjs");
+    const prev = await getTenantFull(tenantId).catch(() => null);
+    if (!prev) return { http: 404, json: { ok: false, error: "البوت غير موجود" } };
+    const prevFeatures = (prev && typeof prev.features === "object" && prev.features) || {};
+    const { onboardingMode: _m, linkedAt: _l, ...restFeatures } = prevFeatures;
+    await updateTenant(tenantId, { phoneNumberId: null, whatsappToken: "", features: restFeatures });
+    logEvent("onboard_unlink", { tenantId }).catch(() => {});
+    return { http: 200, json: { ok: true, unlinked: true } };
+  }
+  app.post("/admin/onboard/unlink", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false, error: "للسوبر أدمن فقط" });
+    const out = await runOnboardUnlink((req.body || {}).tenantId);
+    res.status(out.http).json(out.json);
+  });
+  app.post("/admin/onboard/client-unlink", async (req, res) => {
+    const tenantId = req.clientTenant;
+    if (!tenantId) return res.status(403).json({ ok: false, error: "دخول العميل فقط" });
+    try {
+      const { verifyClientToken } = await import("../../../../portal.mjs");
+      const p = verifyClientToken((req.headers.authorization || "").split(" ")[1] || "");
+      if (!p || p.preview) return res.status(403).json({ ok: false, error: "وضع المعاينة للعرض فقط" });
+    } catch { return res.status(403).json({ ok: false }); }
+    const out = await runOnboardUnlink(tenantId);
+    res.status(out.http).json(out.json);
+  });
   app.post("/admin/onboard/debug", async (req, res) => {
     if (!req.isSuperAdmin) return res.status(403).json({ ok: false });
     try {

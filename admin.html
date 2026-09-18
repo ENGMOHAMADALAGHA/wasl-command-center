@@ -452,6 +452,7 @@
       </div>
       <button id="linkCoexBtn" class="wbtn wbtn-ok w-full mb-2">🟩 ربط تعايش: رقم العميل بضل على تلفونه + البوت (موصى به — دقيقتان)</button>
       <button id="linkMetaBtn" class="wbtn wbtn-s w-full mb-2">🟦 ترحيل كامل للرقم (ينقطع عن التلفون — للحالات الخاصة)</button>
+      <button id="linkUnlinkBtn" class="wbtn w-full mb-2" style="background:#fee2e2;color:#b91c1c">🗑 إلغاء الربط الحالي (لفك ربط خاطئ والبدء من جديد)</button>
       <ol class="text-xs text-slate-600 space-y-1 mb-3 list-decimal pr-4">
         <li>العميل يُبقي رقم <b>واتساب بزنس</b> على هاتفه (لا يحذف شيئاً).</li>
         <li>يربط الرقم عبر Meta (Coexistence) ويعطيك <b>Phone ID</b> و <b>Token</b>.</li>
@@ -1743,6 +1744,25 @@ window.addEventListener("message", (ev) => {
 });
 $("linkCoexBtn").onclick = () => onboardViaMeta("coexistence");
 $("linkMetaBtn").onclick = () => onboardViaMeta("full");
+$("linkUnlinkBtn").onclick = async () => {
+  if (!linkTenantId) return;
+  if (!confirm("إلغاء ربط هذا البوت؟ (بمسح الرقم والتوكن من وصل — للبدء من جديد)")) return;
+  $("linkStatus").textContent = "جاري إلغاء الربط...";
+  try {
+    const j = await api("/admin/onboard/unlink", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tenantId: linkTenantId }),
+    });
+    if (j.unlinked) {
+      $("linkStatus").textContent = "تم إلغاء الربط ✅ البوت فاضي وجاهز لربط جديد";
+      $("linkStatus").className = "text-xs font-bold text-green-700";
+      toast("انفك الربط — اربط من جديد", "success");
+    } else { throw new Error(j.error || "فشل الإلغاء"); }
+  } catch (e) {
+    $("linkStatus").textContent = "❌ " + e.message;
+    $("linkStatus").className = "text-xs font-bold text-red-600";
+  }
+};
 $("linkInviteBtn").onclick = sendInvite;
 $("linkClose").onclick = closeLinkModal;
 
