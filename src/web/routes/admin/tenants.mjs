@@ -225,13 +225,35 @@ export function registerTenantRoutes(app) {
           if (!r.ok || !j.access_token) throw new Error(j?.error?.message || ("تعذر تبادل الكود (HTTP " + r.status + ")"));
           token = j.access_token;
         }
-        // 1ب) بلا IDs؟ اكتشف أرقام العميل من التوكن (يغطي عودة النافذة بلا بيانات)
+        // 1ب) بلا IDs؟ اكتشاف أرقام العميل من التوكن (يغطي عودة النافذة بلا بيانات).
+        // سرد المحافظ محجوب بنافذة الدخول (#100) — البديل: WhatsApp Business Account ID
+        // (معرف علني بلوحة ميتا) وقراءة أرقامه مباحة بصلاحيات الواتساب نفسها.
         if (!phone_number_id) {
           let found = [];
-          try { found = await discoverNumbers(token, ctrl.signal); } catch (e) {
-            throw new Error("تعذر اكتشاف الأرقام: " + String(e?.message || e).slice(0, 120));
+          let discoveryBlocked = false;
+          if (waba_id) {
+            try {
+              const r = await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(waba_id)}/phone_numbers?fields=id,display_phone_number,verified_name&limit=50`, {
+                headers: { Authorization: `Bearer ${token}` }, signal: ctrl.signal,
+              });
+              const j = await r.json().catch(() => ({}));
+              if (!r.ok) throw new Error(j?.error?.message || ("Meta HTTP " + r.status));
+              found = (j.data || []).map((n) => ({ waba_id, waba_name: null, phone_number_id: n.id, display: n.display_phone_number || null, name: n.verified_name || null }));
+            } catch (e) {
+              throw new Error("تعذر قراءة أرقام هذا الحساب: " + String(e?.message || e).slice(0, 120));
+            }
+          } else {
+            try { found = await discoverNumbers(token, ctrl.signal); } catch (e) {
+              discoveryBlocked = true;
+            }
           }
-          if (!found.length) throw new Error("لم نجد أي رقم واتساب على حسابك — تأكد من إضافة الرقم للمحفظة");
+          if (!found.length && !waba_id && discoveryBlocked) {
+            const h = `ob_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+            await storeSet(`onboard_tok:${h}`, { token, at: Date.now() }, 5 * 60 * 1000).catch(() => {});
+            logEvent("onboard_need_waba", { tenantId }).catch(() => {});
+            return { http: 409, json: { ok: false, needWaba: true, handle: h } };
+          }
+          if (!found.length) throw new Error(waba_id ? "لا أرقام تحت هذا الحساب — تحقق من المعرف" : "لم نجد أي رقم واتساب على حسابك — تأكد من إضافة الرقم للمحفظة");
           if (found.length > 1) {
             const h = `ob_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
             await storeSet(`onboard_tok:${h}`, { token, at: Date.now() }, 5 * 60 * 1000).catch(() => {});
