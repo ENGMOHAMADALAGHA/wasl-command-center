@@ -204,6 +204,10 @@ function tenantFromToken() {
   try { return JSON.parse(atob(token.split(".")[1])).tenantId || ""; }
   catch (e) { return ""; }
 }
+function isPreviewToken() {
+  try { return !!JSON.parse(atob(token.split(".")[1])).preview; }
+  catch (e) { return false; }
+}
 
 // ── الدخول ──
 async function doLogin() {
@@ -548,6 +552,7 @@ function loadFbSdk(appId) {
 }
 async function onboardClient(mode) {
   const coex = mode === "coexistence";
+  try { localStorage.setItem("wasl_client_mode", mode); } catch {}
   $("cLinkStatus").textContent = "جاري تجهيز ربط Meta...";
   let cfg;
   try {
@@ -562,20 +567,58 @@ async function onboardClient(mode) {
     try {
       if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("cLinkStatus").textContent = "أُلغي الربط"; return; }
       const ar = resp.authResponse;
-      if (!ar.phone_number_id) { toast("لم يرجع رقم من Meta — أكمل كل خطوات النافذة", "error"); return; }
       $("cLinkStatus").textContent = "جاري تثبيت الربط...";
-      const j = await api("/admin/onboard/client-exchange", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id, mode: coex ? "coexistence" : "full" }),
-      });
-      if (j.linked) {
-        $("cLinkStatus").textContent = "✅ مربوط وشغال" + (j.number ? " (" + j.number + ")" : "");
-        toast("تم ربط رقمك بنجاح ✅", "success");
-      } else { throw new Error(j.error || "فشل التثبيت"); }
+      // بلا IDs؟ الخادم يكتشف الأرقام من التوكن (يغطي عودة النافذة بلا بيانات)
+      await submitClientExchange({ code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id || null, mode: coex ? "coexistence" : "full" });
     } catch (e) {
       $("cLinkStatus").textContent = "❌ " + e.message;
     }
-  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/portal/", extras: { sessionInfoVersion: "3" } });
+  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging,business_management", fallback_redirect_uri: window.location.origin + "/portal/", extras: { sessionInfoVersion: "3" } });
+}
+async function submitClientExchange(payload) {
+  const j = await api("/admin/onboard/client-exchange", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (j.linked) {
+    $("cLinkStatus").textContent = "✅ مربوط وشغال" + (j.number ? " (" + j.number + ")" : "");
+    toast("تم ربط رقمك بنجاح ✅", "success");
+    return;
+  }
+  if (j.needPick && j.handle && Array.isArray(j.candidates)) {
+    renderClientPick(payload.mode, j.handle, j.candidates);
+    return;
+  }
+  throw new Error(j.error || "فشل التثبيت");
+}
+function renderClientPick(mode, handle, candidates) {
+  $("cLinkStatus").textContent = "وجدنا عدة أرقام على حسابك — اختر رقمك:";
+  let sel = $("cPickSel");
+  let btn = $("cPickBtn");
+  if (!sel) {
+    sel = document.createElement("select");
+    sel.id = "cPickSel";
+    sel.className = "field w-full";
+    btn = document.createElement("button");
+    btn.id = "cPickBtn";
+    btn.className = "btn-p w-full";
+    btn.textContent = "تأكيد ربط الرقم المختار";
+    $("cLinkStatus").after(sel, btn);
+  }
+  sel.innerHTML = "";
+  candidates.forEach((c, i) => {
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = (c.display || c.phone_number_id) + (c.name ? " — " + c.name : "");
+    sel.appendChild(o);
+  });
+  btn.onclick = async () => {
+    const c = candidates[Number(sel.value) || 0];
+    $("cLinkStatus").textContent = "جاري تثبيت الربط...";
+    try {
+      await submitClientExchange({ handle, waba_id: c.waba_id, phone_number_id: c.phone_number_id, mode });
+    } catch (e) { $("cLinkStatus").textContent = "❌ " + e.message; }
+  };
 }
 $("cLinkCoex").onclick = () => onboardClient("coexistence");
 $("cLinkFull").onclick = () => onboardClient("full");
@@ -614,6 +657,24 @@ $("cLinkUnlink").onclick = async () => {
     if (lt) lt.style.display = "none";
   }
   if (token && tenantFromToken()) enter();
+  // عودة من Meta بتوكن/كود (redirect): إتمام تلقائي — الخادم يكتشف الرقم
+  try {
+    const h = window.location.hash || "";
+    const q = new URLSearchParams(window.location.search);
+    const tok = (h.match(/access_token=([^&]+)/) || [])[1] || null;
+    const code = q.get("code") || null;
+    if ((tok || code) && token && tenantFromToken() && !isPreviewToken()) {
+      history.replaceState(null, "", window.location.pathname);
+      const mode = localStorage.getItem("wasl_client_mode") || "coexistence";
+      setTimeout(async () => {
+        try {
+          document.querySelector('[data-t="link"]')?.click();
+          $("cLinkStatus").textContent = "رجعت الموافقة من Meta — جاري تثبيت الربط تلقائياً...";
+          await submitClientExchange({ token: tok ? decodeURIComponent(tok) : undefined, code: code || undefined, mode });
+        } catch (e) { $("cLinkStatus").textContent = "❌ " + (e?.message || e); }
+      }, 600);
+    }
+  } catch { /* تجاهل */ }
   setInterval(() => { if (token && !document.hidden) { loadInbox(); if (cur.phone) loadConv(); } }, 8000);
 })();
 </script>

@@ -1676,7 +1676,7 @@ async function onboardViaMeta(mode = "full") {
   if (!linkTenantId) return;
   const coex = mode === "coexistence";
   $("linkStatus").textContent = "جاري تجهيز ربط Meta...";
-  try { sessionStorage.setItem("wasl_pending_link", linkTenantId + "|" + mode); } catch {}
+  try { sessionStorage.setItem("wasl_pending_link", linkTenantId + "|" + mode); localStorage.setItem("wasl_pending_link", linkTenantId + "|" + mode); } catch {}
   let cfg;
   try {
     cfg = await api("/admin/onboard/config");
@@ -1716,24 +1716,64 @@ async function onboardViaMeta(mode = "full") {
     try {
       if (!resp || resp.status !== "connected" || !resp.authResponse?.code) { $("linkStatus").textContent = "أُلغي الربط"; return; }
       const ar = resp.authResponse;
-      if (!ar.phone_number_id) { toast("لم يرجع رقم من Meta — أكمل كل خطوات النافذة", "error"); return; }
       $("linkStatus").textContent = "جاري تثبيت الربط...";
-      const j = await api("/admin/onboard/exchange", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: linkTenantId, code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id, mode: coex ? "coexistence" : "full" }),
-      });
-      if (j.linked) {
-        try { crumb("exchange-ok", "mode=" + (j.mode || "?")); } catch { /* صامت */ }
-        $("linkStatus").textContent = "✅ مربوط عبر Meta" + (j.mode === "coexistence" ? " (تعايش)" : "") + (j.number ? " (" + j.number + ")" : "");
-        $("linkStatus").className = "text-xs font-bold text-green-700";
-        toast("تم الربط عبر Meta ✅" + (j.mode === "coexistence" ? " (تعايش)" : ""), "success");
-      } else { throw new Error(j.error || "فشل التثبيت"); }
+      // بلا IDs؟ الخادم يكتشف الأرقام من التوكن (يغطي عودة النافذة بلا بيانات)
+      await submitExchange({ tenantId: linkTenantId, code: ar.code, waba_id: ar.waba_id || null, phone_number_id: ar.phone_number_id || null, mode: coex ? "coexistence" : "full" });
     } catch (e) {
       try { crumb("exchange-fail", String(e?.message || e).slice(0, 150)); } catch { /* صامت */ }
       $("linkStatus").textContent = "❌ " + e.message;
       $("linkStatus").className = "text-xs font-bold text-red-600";
     }
-  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/admin/", extras: { sessionInfoVersion: "3" } });
+  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging,business_management", fallback_redirect_uri: window.location.origin + "/admin/", extras: { sessionInfoVersion: "3" } });
+}
+// إرسال التبادل + معالجة الرد (ربط مباشر أو اختيار رقم من المرشحين)
+async function submitExchange(payload) {
+  const j = await api("/admin/onboard/exchange", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (j.linked) {
+    try { crumb("exchange-ok", "mode=" + (j.mode || "?")); } catch { /* صامت */ }
+    $("linkStatus").textContent = "✅ مربوط عبر Meta" + (j.mode === "coexistence" ? " (تعايش)" : "") + (j.number ? " (" + j.number + ")" : "");
+    $("linkStatus").className = "text-xs font-bold text-green-700";
+    toast("تم الربط عبر Meta ✅" + (j.mode === "coexistence" ? " (تعايش)" : ""), "success");
+    return;
+  }
+  if (j.needPick && j.handle && Array.isArray(j.candidates)) {
+    renderPickList(payload.tenantId, payload.mode, j.handle, j.candidates);
+    return;
+  }
+  throw new Error(j.error || "فشل التثبيت");
+}
+// عدة أرقام على الحساب؟ اعرض اختياراً — التأكيد يكمل بنفس الجلسة المحفوظة server-side
+function renderPickList(tenantId, mode, handle, candidates) {
+  $("linkStatus").textContent = "وجدنا عدة أرقام على حسابك — اختر رقم البوت:";
+  $("linkStatus").className = "text-xs font-bold text-slate-700";
+  const box = $("linkResult");
+  box.classList.remove("hidden");
+  box.innerHTML = "";
+  const sel = document.createElement("select");
+  sel.className = "field w-full mb-2";
+  candidates.forEach((c, i) => {
+    const o = document.createElement("option");
+    o.value = i;
+    o.textContent = (c.display || c.phone_number_id) + (c.name ? " — " + c.name : "");
+    sel.appendChild(o);
+  });
+  const btn = document.createElement("button");
+  btn.className = "wbtn wbtn-ok w-full";
+  btn.textContent = "تأكيد ربط الرقم المختار";
+  btn.onclick = async () => {
+    const c = candidates[Number(sel.value) || 0];
+    $("linkStatus").textContent = "جاري تثبيت الربط...";
+    try {
+      await submitExchange({ tenantId, handle, waba_id: c.waba_id, phone_number_id: c.phone_number_id, mode });
+    } catch (e) {
+      $("linkStatus").textContent = "❌ " + e.message;
+      $("linkStatus").className = "text-xs font-bold text-red-600";
+    }
+  };
+  box.append(sel, btn);
 }
 // أحداث نافذة Meta (خطأ) للتنبيه الفوري — النجاح يمر عبر exchange أعلاه
 window.addEventListener("message", (ev) => {
@@ -1766,28 +1806,47 @@ $("linkUnlinkBtn").onclick = async () => {
 $("linkInviteBtn").onclick = sendInvite;
 $("linkClose").onclick = closeLinkModal;
 
-// عودة من Meta على الجذري (توكن بالـ hash): الصفحة الأم تحوله لهون —
-// نسترجع البوت المعلق ونطلب ضغطة واحدة للإتمام (الجلسة نشطة فيُرجع الكود فوراً عبر الـ SDK)
-function resumeMetaReturn() {
+// عودة من Meta (توكن بالـ hash أو كود بالاستعلام): إتمام تلقائي بلا ضغطة إضافية —
+// الخادم يكتشف الأرقام من التوكن (رقم واحد = ربط فوري، أكثر = اختيار)
+async function resumeMetaReturn() {
   try {
     const h = window.location.hash || "";
-    if (!/(access_token|code)=/.test(h)) return;
+    const q = new URLSearchParams(window.location.search);
+    const hashTok = (h.match(/access_token=([^&]+)/) || [])[1] || null;
+    const qCode = q.get("code") || null;
+    if (!hashTok && !qCode && !/(access_token|code)=/.test(h)) return;
     try {
       api("/admin/onboard/debug", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tenantId: (sessionStorage.getItem("wasl_pending_link") || "|").split("|")[0] || "unknown", stage: "redirect-back", info: "hash-present" }),
+        body: JSON.stringify({ tenantId: ((sessionStorage.getItem("wasl_pending_link") || localStorage.getItem("wasl_pending_link") || "|").split("|")[0]) || "unknown", stage: "redirect-back", info: hashTok ? "token-present" : "code-present" }),
       }).catch(() => {});
     } catch { /* صامت */ }
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    const pending = sessionStorage.getItem("wasl_pending_link");
+    history.replaceState(null, "", window.location.pathname);
+    const pending = sessionStorage.getItem("wasl_pending_link") || localStorage.getItem("wasl_pending_link");
     if (pending) {
       const [pid, pmode] = String(pending).split("|");
-      try { openLinkModal(pid); } catch { linkTenantId = pid; }
       const coexBack = pmode === "coexistence";
+      try { openLinkModal(pid); } catch { linkTenantId = pid; }
+      // التوكن/الكود العائد يكفي وحده: الخادم يكتشف الرقم ويثبت الربط تلقائياً
+      if (hashTok || qCode) {
+        try { localStorage.setItem("wasl_pending_link", pid + "|" + (coexBack ? "coexistence" : "full")); } catch {}
+        $("linkStatus").textContent = "رجعت الموافقة من Meta — جاري تثبيت الربط تلقائياً...";
+        $("linkStatus").className = "text-xs font-bold text-slate-700";
+        try {
+          await submitExchange({ tenantId: pid, token: hashTok ? decodeURIComponent(hashTok) : undefined, code: qCode || undefined, mode: coexBack ? "coexistence" : "full" });
+          try { sessionStorage.removeItem("wasl_pending_link"); localStorage.removeItem("wasl_pending_link"); } catch {}
+        } catch (e) {
+          $("linkStatus").textContent = "❌ " + (e?.message || e);
+          $("linkStatus").className = "text-xs font-bold text-red-600";
+        }
+        return;
+      }
       $("linkStatus").textContent = "تمت الموافقة من Meta ✅ اضغط زر " + (coexBack ? "ربط التعايش" : "الترحيل الكامل") + " مرة واحدة للإتمام";
       $("linkStatus").className = "text-xs font-bold text-green-700";
       try { sessionStorage.setItem("wasl_pending_link", pid + "|" + (coexBack ? "coexistence" : "full")); } catch {}
     }
+  } catch {}
+}
   } catch {}
 }
 

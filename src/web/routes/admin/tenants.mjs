@@ -170,23 +170,77 @@ export function registerTenantRoutes(app) {
     res.json({ ok: true, enabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID), appId: META_APP_ID || null, configId: META_EMBEDDED_CONFIG_ID || null, coexConfigId: META_EMBEDDED_CONFIG_ID_COEX || null, coexEnabled: !!(META_APP_ID && META_EMBEDDED_CONFIG_ID_COEX) });
   });
   // منطق التبادل المشترك: السوبر يمرر أي tenantId، والعميل يُقفل على بوته فقط
-  async function runOnboardExchange({ tenantId, code, waba_id, phone_number_id, mode }) {
+  // يكتشف أرقام العميل من التوكن عند غياب IDs (نافذة لم ترجع بيانات):
+  // رقم واحد → ربط تلقائي، أكثر → handle لاختيار واحد (التوكن لا يغادر الخادم أبداً)
+  async function discoverNumbers(token, signal) {
+    const g = async (path) => {
+      const r = await fetch(`https://graph.facebook.com/v21.0/${path}`, {
+        headers: { Authorization: `Bearer ${token}` }, signal,
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(j?.error?.message || ("Meta HTTP " + r.status));
+      return j;
+    };
+    const out = [];
+    const biz = await g("me/businesses?fields=id,name&limit=50");
+    for (const b of biz.data || []) {
+      let wabas = null;
+      try { wabas = await g(`${encodeURIComponent(b.id)}/owned_whatsapp_business_accounts?fields=id,name&limit=50`); } catch { continue; }
+      for (const w of wabas.data || []) {
+        let nums = null;
+        try { nums = await g(`${encodeURIComponent(w.id)}/phone_numbers?fields=id,display_phone_number,verified_name&limit=50`); } catch { continue; }
+        for (const n of nums.data || []) {
+          out.push({ waba_id: w.id, waba_name: w.name || null, phone_number_id: n.id, display: n.display_phone_number || null, name: n.verified_name || null });
+        }
+      }
+    }
+    return out;
+  }
+  async function runOnboardExchange({ tenantId, code, handle, token: directToken, waba_id, phone_number_id, mode }) {
     const onboardingMode = mode === "coexistence" ? "coexistence" : "full";
-    if (!tenantId || !code || !phone_number_id) {
-      return { http: 400, json: { ok: false, error: "tenantId و code و phone_number_id مطلوبة" } };
+    if (!tenantId || (!code && !handle && !directToken)) {
+      return { http: 400, json: { ok: false, error: "tenantId و (code أو handle أو token) مطلوبة" } };
     }
     try {
       const { META_APP_ID, META_APP_SECRET } = await import("../../../config/env.mjs");
       if (!META_APP_ID || !META_APP_SECRET) throw new Error("META_APP_ID/META_APP_SECRET غير مضبوطة بالبيئة");
+      const { storeGet, storeSet, storeDel } = await import("../../../../store.mjs");
       const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 20000);
+      const timer = setTimeout(() => ctrl.abort(), 30000);
       try {
-        // 1) تبادل الكود بتوكن تكامل دائم (server-side فقط — الكود لا يُخزن)
-        const u = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(META_APP_ID)}&client_secret=${encodeURIComponent(META_APP_SECRET)}&code=${encodeURIComponent(code)}`;
-        const r = await fetch(u, { signal: ctrl.signal });
-        const j = await r.json().catch(() => ({}));
-        if (!r.ok || !j.access_token) throw new Error(j?.error?.message || ("تعذر تبادل الكود (HTTP " + r.status + ")"));
-        const token = j.access_token;
+        // 0) مصدر التوكن: handle لمرة واحدة، أو توكن عائد من نافذة، أو تبادل كود جديد
+        let token = null;
+        if (handle) {
+          const rec = await storeGet(`onboard_tok:${handle}`).catch(() => null);
+          await storeDel(`onboard_tok:${handle}`).catch(() => {});
+          token = rec?.token || null;
+          if (!token) throw new Error("انتهت صلاحية الجلسة — أعد الربط من جديد");
+        } else if (directToken) {
+          token = String(directToken);
+        } else {
+          // 1) تبادل الكود بتوكن تكامل دائم (server-side فقط — الكود لا يُخزن)
+          const u = `https://graph.facebook.com/v21.0/oauth/access_token?client_id=${encodeURIComponent(META_APP_ID)}&client_secret=${encodeURIComponent(META_APP_SECRET)}&code=${encodeURIComponent(code)}`;
+          const r = await fetch(u, { signal: ctrl.signal });
+          const j = await r.json().catch(() => ({}));
+          if (!r.ok || !j.access_token) throw new Error(j?.error?.message || ("تعذر تبادل الكود (HTTP " + r.status + ")"));
+          token = j.access_token;
+        }
+        // 1ب) بلا IDs؟ اكتشف أرقام العميل من التوكن (يغطي عودة النافذة بلا بيانات)
+        if (!phone_number_id) {
+          let found = [];
+          try { found = await discoverNumbers(token, ctrl.signal); } catch (e) {
+            throw new Error("تعذر اكتشاف الأرقام: " + String(e?.message || e).slice(0, 120));
+          }
+          if (!found.length) throw new Error("لم نجد أي رقم واتساب على حسابك — تأكد من إضافة الرقم للمحفظة");
+          if (found.length > 1) {
+            const h = `ob_${Date.now().toString(36)}${Math.floor(Math.random() * 1e6).toString(36)}`;
+            await storeSet(`onboard_tok:${h}`, { token, at: Date.now() }, 5 * 60 * 1000).catch(() => {});
+            logEvent("onboard_need_pick", { tenantId, count: found.length }).catch(() => {});
+            return { http: 409, json: { ok: false, needPick: true, handle: h, candidates: found } };
+          }
+          waba_id = waba_id || found[0].waba_id;
+          phone_number_id = found[0].phone_number_id;
+        }
         // 2) اشتراك تطبيقنا بأحداث هذه الـ WABA (وصول الرسائل للـ webhook)
         if (waba_id) {
           await fetch(`https://graph.facebook.com/v21.0/${encodeURIComponent(waba_id)}/subscribed_apps`, {
