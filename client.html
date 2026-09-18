@@ -573,7 +573,7 @@ async function onboardClient(mode) {
     } catch (e) {
       $("cLinkStatus").textContent = "❌ " + e.message;
     }
-  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging,business_management", fallback_redirect_uri: window.location.origin + "/portal/", extras: { sessionInfoVersion: "3" } });
+  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/portal/", extras: { sessionInfoVersion: 3 } });
 }
 async function submitClientExchange(payload) {
   const j = await api("/admin/onboard/client-exchange", {

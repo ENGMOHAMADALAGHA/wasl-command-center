@@ -1724,7 +1724,7 @@ async function onboardViaMeta(mode = "full") {
       $("linkStatus").textContent = "❌ " + e.message;
       $("linkStatus").className = "text-xs font-bold text-red-600";
     }
-  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging,business_management", fallback_redirect_uri: window.location.origin + "/admin/", extras: { sessionInfoVersion: "3" } });
+  }, { config_id: cid, response_type: "code", override_default_response_type: true, auth_type: "rerequest", scope: "public_profile,whatsapp_business_management,whatsapp_business_messaging", fallback_redirect_uri: window.location.origin + "/admin/", extras: { sessionInfoVersion: 3 } });
 }
 // إرسال التبادل + معالجة الرد (ربط مباشر أو اختيار رقم من المرشحين)
 async function submitExchange(payload) {
