@@ -9,9 +9,8 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping Render
+      - name: Ping Render (healthz only — no auth, no DB spam)
         run: |
           set -o pipefail
           curl --fail --show-error --max-time 30 https://wasl-command-center.onrender.com/healthz | head -c 200; echo
-          curl --fail --show-error --max-time 30 https://wasl-command-center.onrender.com/ | head -c 200; echo
-          echo "Ping done"
+          echo "Ping done — $(date -u +%Y-%m-%dT%H:%M:%SZ)"

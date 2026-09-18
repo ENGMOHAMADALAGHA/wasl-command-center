@@ -5,7 +5,7 @@ services:
   - type: web
     name: wasl-command-center
     runtime: node
-    plan: free
+    plan: starter # Free ينام بعد 15د (تأخير 10-20ث عند أول رسالة) — Starter لا ينام أبداً
     buildCommand: npm install
     startCommand: node server.mjs
     healthCheckPath: /healthz
@@ -17,3 +17,4 @@ services:
       # DATABASE_URL, GOOGLE_API_KEY, AI_MODEL, PORT, WEBHOOK_VERIFY_TOKEN,
       # WHATSAPP_TOKEN, WHATSAPP_PHONE_ID, TOKEN_ENC_KEY, META_APP_SECRET,
       # ADMIN_USER, ADMIN_PASS, JWT_SECRET, WA_FOLLOWUP_TEMPLATE
+      # للطابور الدائم (الحل 3): أضف REDIS_URL من Upstash/Redis Cloud + USE_DURABLE_QUEUE=1
