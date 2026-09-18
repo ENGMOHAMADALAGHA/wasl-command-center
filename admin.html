@@ -1574,22 +1574,37 @@ function closeLinkModal() {
   linkTenantId = null;
 }
 
+let testCooldownUntil = 0;
 async function testLink() {
   if (!linkTenantId) return;
+  // قفل ضد التكرار: ميتا تحد من فحص الـ Graph المتكرر (429) — نمنع الضغط الغبي
+  const now = Date.now();
+  if (now < testCooldownUntil) {
+    const s = Math.ceil((testCooldownUntil - now) / 1000);
+    toast(`اهدى شريك 😅 الفحص متاح بعد ${s} ثانية (ميتا تحد من التكرار)`, "info");
+    return;
+  }
+  testCooldownUntil = now + 15000;
+  $("linkTestBtn").disabled = true;
   $("linkStatus").textContent = "جاري الفحص...";
   try {
     const j = await api("/admin/tenants/" + encodeURIComponent(linkTenantId) + "/test-link", { method: "POST" });
     if (j.linked) {
+      testCooldownUntil = 0;
       $("linkStatus").textContent = "✅ مربوط وشغال" + (j.number ? " (" + j.number + ")" : "");
       $("linkStatus").className = "text-xs font-bold text-green-700";
       toast("الربط شغال ✅", "success");
     } else {
       $("linkStatus").textContent = "❌ " + (j.reason || "غير مربوط");
       $("linkStatus").className = "text-xs font-bold text-red-600";
+      // 429 من ميتا = ضغط زائد: مدد القفل دقيقة كاملة
+      if (/429/.test(j.reason || "")) testCooldownUntil = Date.now() + 60000;
     }
   } catch (e) {
     $("linkStatus").textContent = "❌ تعذر الفحص: " + e.message;
     $("linkStatus").className = "text-xs font-bold text-red-600";
+  } finally {
+    $("linkTestBtn").disabled = false;
   }
 }
 
