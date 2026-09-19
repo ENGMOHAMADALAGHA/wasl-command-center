@@ -31,6 +31,7 @@ export function registerTenantRoutes(app) {
     try {
       const created = await addTenant(req.body || {});
       console.log(`  ➕ tenant جديد: ${created.id} (${created.name}) plan=${created.plan}`);
+      logEvent("tenant_created", { tenantId: created.id, actor: req.isSuperAdmin ? "super" : req.clientTenant || "system", plan: created.plan }).catch(()=>{});
       const { whatsappToken: _s, ...safe } = created;
       res.status(201).json({ ok: true, tenant: { ...safe, hasOwnToken: !!created.whatsappToken } });
     } catch (e) {
@@ -42,7 +43,6 @@ export function registerTenantRoutes(app) {
     }
   });
   app.patch("/admin/tenants/:id", async (req, res) => {
-    // عزل العملاء: JWT العميل مقيد ببوته فقط — أي id آخر مرفوض
     if (req.clientTenant && req.params.id !== req.clientTenant) {
       return res.status(403).json({ ok: false, error: "غير مصرح — هذا البوت ليس لك" });
     }
@@ -50,13 +50,13 @@ export function registerTenantRoutes(app) {
       const { updateTenant, isTrialExpired } = await import("../../../../tenants.mjs");
       const updated = await updateTenant(req.params.id, req.body || {});
       console.log(`  🔌 tenant ${updated.id} enabled=${updated.enabled} plan=${updated.plan}`);
+      logEvent("tenant_updated", { tenantId: updated.id, actor: req.isSuperAdmin ? "super" : req.clientTenant, fields: Object.keys(req.body||{}) }).catch(()=>{});
       res.json({ ok: true, tenant: { id: updated.id, enabled: updated.enabled, plan: updated.plan, trialExpired: isTrialExpired(updated) } });
     } catch (e) {
       if (e?.code === "P2002") {
         const field = e?.meta?.target?.join?.(",") || "phone_number_id";
         return res.status(409).json({ ok: false, error: `تعارض: ${field} مسجل مسبقاً — رقم واحد لكل بوت` });
       }
-      // P2025 = البوت غير موجود بهذه القاعدة (قائمة قديمة؟ سيرفر مختلف؟) — 404 واضحة بدل 400 عمياء
       if (e?.code === "P2025") {
         return res.status(404).json({ ok: false, error: `البوت "${req.params.id}" غير موجود — حدّث قائمة البوتات وحاول مجدداً` });
       }
@@ -84,6 +84,7 @@ export function registerTenantRoutes(app) {
       const { deleteTenant } = await import("../../../../tenants.mjs");
       const out = await deleteTenant(req.params.id);
       console.log(`  🗑️ حذف tenant: ${out.id}`);
+      logEvent("tenant_deleted", { tenantId: out.id, actor: req.isSuperAdmin ? "super" : req.clientTenant }).catch(()=>{});
       res.json({ ok: true, deleted: out.id });
     } catch (e) {
       res.status(400).json({ ok: false, error: e.message });

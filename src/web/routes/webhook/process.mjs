@@ -108,7 +108,7 @@ export async function processWebhookBody(body) {
 
           console.log(`\n${"─".repeat(60)}`);
           console.log(`  🏢 tenant=${tenant?.id} | بوت=${tenant?.botName}`);
-          console.log(`  📥 رسالة واتساب من ${name} (${from}): "${ctx.text}"${buttonId ? ` [btn=${buttonId}]` : ""}`);
+          console.log(`  📥 رسالة واتساب من ${name} (${from}): "${String(ctx.text||"").slice(0,80)}"${buttonId ? ` [btn=${buttonId}]` : ""}`);
           console.log(`  🧠 الذاكرة: ${(await getHistory(from, tenant)).length} رسائل سابقة`);
 
           // ملاحظة الترتيب: الطاقم/takeover أولاً — زر الشراء لا يتجاوز إسكات "قف"
