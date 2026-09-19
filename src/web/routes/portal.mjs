@@ -10,7 +10,7 @@ export function registerPortalRoutes(app) {
       const { tenantId, phone, password } = req.body || {};
       // حماية تخمين: 5 محاولات/دقيقة لكل حساب
       const ip = req.ip || req.socket?.remoteAddress || "unknown";
-      const lim = checkLimit(loginKey(tenantId, phone, ip), 5, 60 * 1000);
+      const lim = await checkLimit(loginKey(tenantId, phone, ip), 5, 60 * 1000);
       if (!lim.allowed) {
         return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });
       }
@@ -32,7 +32,7 @@ export function registerPortalRoutes(app) {
       const { tenantId, phone } = req.body || {};
       // حماية من سبام الرسائل + تخمين: 3 طلبات/دقيقة لكل حساب
       const ip = req.ip || req.socket?.remoteAddress || "unknown";
-      const lim = checkLimit(loginKey(tenantId, phone, ip) + ":forgot", 3, 60 * 1000);
+      const lim = await checkLimit(loginKey(tenantId, phone, ip) + ":forgot", 3, 60 * 1000);
       if (!lim.allowed) {
         return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });
       }
@@ -49,7 +49,7 @@ export function registerPortalRoutes(app) {
     const { tenantId, phone, code, newPassword } = req.body || {};
     // حماية تخمين الرمز: 5 محاولات/15 دقيقة لكل حساب+IP (مؤكد حاسوبياً ضد القوة العمياء)
     const ip = req.ip || req.socket?.remoteAddress || "unknown";
-    const lim = checkLimit(`${loginKey(tenantId, phone, ip)}:reset`, 5, 15 * 60 * 1000);
+    const lim = await checkLimit(`${loginKey(tenantId, phone, ip)}:reset`, 5, 15 * 60 * 1000);
     if (!lim.allowed) {
       return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });
     }

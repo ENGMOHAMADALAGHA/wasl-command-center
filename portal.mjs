@@ -60,7 +60,7 @@ export async function verifyClientUser(tenantId, phone, password) {
 
 export function signClientToken(user) {
   return jwt.sign(
-    { sub: user.id, tenantId: user.tenantId, phone: user.phone, role: "client" },
+    { sub: user.id, tenantId: user.tenantId, phone: user.phone, role: "client", v: Date.now() },
     secret(),
     { expiresIn: "12h" }
   );
@@ -76,14 +76,27 @@ export function signPreviewToken(tenantId) {
   );
 }
 
-export function verifyClientToken(token) {
+export async function verifyClientToken(token) {
   try {
     const p = jwt.verify(token, secret());
     if (p.role !== "client" || !p.tenantId) return null;
+    // إلغاء سريع بعد reset: قارن iat مع revokedAt المخزن
+    try {
+      const { storeGet } = await import("./store.mjs");
+      const revoked = await storeGet(`jwtRevoked:${p.tenantId}:${p.phone}`);
+      if (revoked?.at && p.iat * 1000 < revoked.at) return null;
+    } catch {}
     return p;
   } catch {
     return null;
   }
+}
+export function verifyClientTokenSync(token) {
+  try {
+    const p = jwt.verify(token, secret());
+    if (p.role !== "client" || !p.tenantId) return null;
+    return p;
+  } catch { return null; }
 }
 
 // —— نسيت كلمة السر: كود من 6 أرقام عبر واتساب ——
@@ -121,6 +134,10 @@ export async function finishPasswordReset(tenantId, phone, code, newPassword) {
     where: { id: u.id },
     data: { passwordHash: await bcrypt.hash(String(newPassword), 10), resetCode: null, resetExpires: null },
   });
+  try {
+    const { storeSet } = await import("./store.mjs");
+    await storeSet(`jwtRevoked:${tenantId}:${phone}`, { at: Date.now() }, 12 * 60 * 60 * 1000);
+  } catch {}
   return true;
 }
 

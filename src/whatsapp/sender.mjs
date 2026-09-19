@@ -8,9 +8,8 @@ import { checkLimit, tenantSendKey } from "../security/rateLimit.mjs";
 import { sendWithRetry } from "./outbound.mjs";
 import { normalizePhone } from "../utils/phone.mjs";
 
-// حد الإرسال لكل بوت: 60 رسالة/دقيقة (حماية من حظر Meta)
 async function guardSend(tenant, phoneId) {
-  const lim = checkLimit(tenantSendKey(tenant?.id || phoneId || "default"), 60, 60 * 1000);
+  const lim = await checkLimit(tenantSendKey(tenant?.id || phoneId || "default"), 60, 60 * 1000);
   if (!lim.allowed) {
     const e = new Error(`تجاوز حد الإرسال — أعد المحاولة بعد ${lim.retryAfter}ث`);
     e.code = "RATE_LIMITED";

@@ -153,7 +153,7 @@ test("adminRateLimit: حامل JWT معفي (رشقات البوابة) وغير
   // Bearer يمر دائماً بلا عد
   let passed = 0;
   for (let i = 0; i < 25; i++) {
-    adminRateLimit({ ip: "9.9.9.9", headers: { authorization: "Bearer jwt.jwt.jwt" } }, { setHeader() {}, status(c) { this.code = c; return { json: () => {} }; } }, () => passed++);
+    await adminRateLimit({ ip: "9.9.9.9", headers: { authorization: "Bearer jwt.jwt.jwt" } }, { setHeader() {}, status(c) { this.code = c; return { json: () => {} }; } }, () => passed++);
   }
   assert.equal(passed, 25);
   const ip = `test-${Date.now()}-${Math.random()}`;
@@ -162,7 +162,7 @@ test("adminRateLimit: حامل JWT معفي (رشقات البوابة) وغير
   for (let i = 0; i < 25; i++) {
     let passed = false;
     const res = { setHeader() {}, status(c) { this.code = c; return { json: () => {} }; } };
-    adminRateLimit({ ip, path: "/tenants" }, res, () => { passed = true; });
+    await adminRateLimit({ ip, path: "/tenants" }, res, () => { passed = true; });
     if (passed) allowed++;
     else if (res.code === 429) blocked++;
   }

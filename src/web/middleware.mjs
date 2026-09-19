@@ -3,15 +3,12 @@ import { ADMIN_USER, ADMIN_PASS, META_APP_SECRET } from "../config/env.mjs";
 import { checkLimit } from "../security/rateLimit.mjs";
 import { getTenantFull } from "../../tenants.mjs";
 
-// ── حماية تخمين /admin: 20 محاولة/دقيقة لكل IP (بلا اعتماد فقط) ──
-// الموثوق (سوبر/Bearer) يتجاوز: التخمين يطال من لا اعتماد معه أصلاً.
-// (قبل الإصلاح كان يحسب التحديث التلقائي كل 4ث + التحديث اليدوي فيصيب نفسه بالـ 429)
-export function adminRateLimit(req, res, next) {
+export async function adminRateLimit(req, res, next) {
   if (req.isSuperAdmin || req.clientTenant) return next();
   const header = req.headers?.authorization || "";
   if (header.startsWith("Bearer ")) return next();
   const ip = req.ip || req.socket?.remoteAddress || "unknown";
-  const lim = checkLimit(`admin:${ip}`, 20, 60 * 1000);
+  const lim = await checkLimit(`admin:${ip}`, 20, 60 * 1000);
   if (!lim.allowed) {
     res.setHeader("Retry-After", String(lim.retryAfter));
     return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });
@@ -29,7 +26,7 @@ export const adminAuth = async (req, res, next) => {
   // 1) عميل بـ JWT؟
   if (scheme === "Bearer" && encoded) {
     const { verifyClientToken } = await import("../../portal.mjs");
-    const p = verifyClientToken(encoded);
+    const p = await verifyClientToken(encoded);
     if (p) {
       // kill switch + trial: الموقوف أو منتهي التجربة لا يدخل
       const t = await getTenantFull(p.tenantId);
@@ -57,21 +54,16 @@ export const adminAuth = async (req, res, next) => {
       req.isSuperAdmin = true;
       return next();
     }
-    // كلمة خاطئة: تُحتسب ضد المخمن فقط (المصادق عليه لا يُحسب أبداً — إصلاح 429 الذاتي)
     const ip = req.ip || req.socket?.remoteAddress || "unknown";
-    const lim = checkLimit(`adminfail:${ip}`, 20, 60 * 1000);
+    const lim = await checkLimit(`adminfail:${ip}`, 20, 60 * 1000);
     if (!lim.allowed) {
       res.setHeader("Retry-After", String(lim.retryAfter));
       return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });
     }
   }
-  // نافذة الدخول الأصلية للمتصفح تُعرض فقط لصفحة HTML نفسها —
-  // أما API (JSON) فيرجع 401 بدون WWW-Authenticate حتى لا تطلق هواتف iOS
-  // نافذة نظام مع كل طلب خلفية (تُرى كحلقة "إلغاء لا يذهب").
-  // استطلاع مجهول (بلا اعتماد) يُحسب ضد المستطلِع فقط — المصادق عليه حر تماماً
   if (!(req.headers.authorization || "")) {
     const ip = req.ip || req.socket?.remoteAddress || "unknown";
-    const lim = checkLimit(`adminanon:${ip}`, 20, 60 * 1000);
+    const lim = await checkLimit(`adminanon:${ip}`, 20, 60 * 1000);
     if (!lim.allowed) {
       res.setHeader("Retry-After", String(lim.retryAfter));
       return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${lim.retryAfter} ثانية` });

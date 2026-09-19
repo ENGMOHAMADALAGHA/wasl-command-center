@@ -64,8 +64,7 @@ export async function processWebhookBody(body) {
           // Coexistence: صدى العيادة من تطبيقها (from = رقم البوت) — مسار خاص:
           // تخزين + إيقاف مؤقت، بلا حد معدل ولا امتثال ولا رد أبداً
           if (await handleCoexEcho({ msg, value, contacts, tenant, ch })) continue;
-          // حد المعدل: 30 رسالة/دقيقة لكل رقم (حماية من الحلقات وتكلفة AI)
-          const rl = checkLimit(senderKey(from), 30, 60 * 1000);
+          const rl = await checkLimit(senderKey(from), 30, 60 * 1000);
           if (!rl.allowed) {
             console.warn(`  ⏱️ تجاوز الحد من ${from} — تم التجاهل (${rl.retryAfter}ث)`);
             logEvent("dead_letter", { scope: "message", reason: "rate-limited", tenantId: tenant?.id, phone: from, wamid: msg?.id || null, retryAfter: rl.retryAfter }).catch(() => {});

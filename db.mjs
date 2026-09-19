@@ -9,13 +9,12 @@ export function isDbEnabled() {
 
 function normalizedUrl() {
   let url = process.env.DATABASE_URL || "";
-  // وضع pgbouncer لاتصالات الـ pooler (منفذ 6543)
+  // pgbouncer: 5 اتصالات تكفي 5+2+3 للطوابير + webhook (كان 1 يخنق الكل)
   if (url.includes(":6543/") && !url.includes("pgbouncer=")) {
-    url += (url.includes("?") ? "&" : "?") + "pgbouncer=true&connection_limit=1";
+    url += (url.includes("?") ? "&" : "?") + "pgbouncer=true&connection_limit=5";
   }
-  // صبيب Neon (اسم مضيف يحوي -pooler.) — اتصال معاملاتي خفيف مجدول
   if (/-pooler\./.test(url) && !url.includes("pgbouncer=")) {
-    url += (url.includes("?") ? "&" : "?") + "pgbouncer=true&connection_limit=1";
+    url += (url.includes("?") ? "&" : "?") + "pgbouncer=true&connection_limit=5";
   }
   // Neon يتطلب TLS صراحةً — نضمنه حتى لو حذفه المستخدم من الرابط
   if (/neon\.tech/.test(url) && !/sslmode=/.test(url)) {

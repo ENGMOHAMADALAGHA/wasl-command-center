@@ -319,7 +319,7 @@ export function registerTenantRoutes(app) {
     } catch { return res.status(403).json({ ok: false }); }
     try {
       const { checkLimit } = await import("../../../security/rateLimit.mjs");
-      const rl = checkLimit(`onboard:${tenantId}`, 5, 60 * 1000);
+      const rl = await checkLimit(`onboard:${tenantId}`, 5, 60 * 1000);
       if (!rl.allowed) return res.status(429).json({ ok: false, error: `محاولات كثيرة — حاول بعد ${rl.retryAfter} ثانية` });
     } catch { /* بلا حد = أكمل */ }
     const { isTenantActive } = await import("../../../../tenants.mjs");

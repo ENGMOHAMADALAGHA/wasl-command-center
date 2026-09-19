@@ -19,23 +19,22 @@ export async function listInbox(tenantFilter) {
       _max: { createdAt: true },
       _count: { _all: true },
     });
-    const out = [];
-    for (const g of rows.slice(0, 200)) {
-      const last = await tenantDb(g.tenantId).message.findFirst({
-        where: { phone: g.phone },
-        orderBy: { createdAt: "desc" },
-      });
-      out.push({
-        tenantId: g.tenantId,
-        phone: g.phone,
-        count: g._count._all,
-        updatedAt: new Date(g._max.createdAt).getTime(),
-        takeover: await isTakeover(g.tenantId, g.phone),
-        lastMessage: last ? { role: last.role, text: (last.text || "").slice(0, 120) } : null,
-      });
-    }
-    out.sort((a, b) => b.updatedAt - a.updatedAt);
-    return out;
+    // ترتيب قبل القص — Top-200 الحقيقية (كان يقطع 200 عشوائية ثم يرتب)
+    rows.sort((a, b) => new Date(b._max.createdAt) - new Date(a._max.createdAt));
+    const slice = rows.slice(0, 200);
+    // حمولة واحدة لكل محادثة بدل N+1: نجلب آخر رسالة لكل مجموعة بدفعة
+    const lasts = await Promise.all(
+      slice.map((g) => tenantDb(g.tenantId).message.findFirst({ where: { phone: g.phone }, orderBy: { createdAt: "desc" } }))
+    );
+    const takeovers = await Promise.all(slice.map((g) => isTakeover(g.tenantId, g.phone)));
+    return slice.map((g, i) => ({
+      tenantId: g.tenantId,
+      phone: g.phone,
+      count: g._count._all,
+      updatedAt: new Date(g._max.createdAt).getTime(),
+      takeover: takeovers[i],
+      lastMessage: lasts[i] ? { role: lasts[i].role, text: (lasts[i].text || "").slice(0, 120) } : null,
+    }));
   } catch (e) {
     console.error(`  ⚠️ فشل Inbox: ${e.message}`);
     return [];

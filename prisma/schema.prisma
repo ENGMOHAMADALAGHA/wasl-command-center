@@ -137,6 +137,8 @@ model KvStore {
   expiresAt DateTime? @map("expires_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  @@index([key])
+  @@index([expiresAt])
   @@map("kv_store")
 }
 
