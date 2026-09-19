@@ -11,8 +11,12 @@ export function registerInboxRoutes(app) {
   app.get("/admin/inbox", async (req, res) => {
     const scope = resolveScope(req, req.query.tenant);
     if (scope.denied) return denyGlobal(res);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(Math.max(1, Number(req.query.limit || 50)), 100);
     const inbox = await listInbox(scope.global ? undefined : scope.tenant);
-    res.json({ count: inbox.length, inbox });
+    const total = inbox.length;
+    const slice = inbox.slice((page - 1) * limit, page * limit);
+    res.json({ count: total, page, limit, inbox: slice });
   });
   app.get("/admin/inbox/:tenantId/:phone", async (req, res) => {
     if (req.clientTenant && req.params.tenantId !== req.clientTenant) {

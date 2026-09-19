@@ -1,6 +1,7 @@
 import express from "express";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import helmet from "helmet";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -24,18 +25,9 @@ import { startSchedulers } from "../jobs/schedulers.mjs";
 
 export function createApp() {
   const app = express();
-
-  // ترويسات أمنية عامة بدل الاعتماد على خوادم خارجية
-  // (CSP متعمد: بلا ترويض لأن الكونسول يعتمد Tailwind/Script مضمّن — التعقيد وقابلية الكسر أكبر من منفعته)
+  app.use(helmet({ contentSecurityPolicy: false, crossOriginEmbedderPolicy: false }));
   app.use((req, res, next) => {
-    res.setHeader("X-Content-Type-Options", "nosniff");
-    res.setHeader("Referrer-Policy", "no-referrer");
-    // لوحات الإدارة لا تُؤطَّر أبداً؛ معاينات البوابة (iframe same-origin) تبقى مسموحة بـ SAMEORIGIN
     res.setHeader("X-Frame-Options", req.path.startsWith("/admin") ? "DENY" : "SAMEORIGIN");
-    res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-    if (process.env.NODE_ENV === "production") {
-      res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
-    }
     next();
   });
 

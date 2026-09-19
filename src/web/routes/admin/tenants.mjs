@@ -112,7 +112,7 @@ export function registerTenantRoutes(app) {
       const timer = setTimeout(() => ctrl.abort(), 15000);
       let r, data;
       try {
-        r = await fetch(`https://graph.facebook.com/v18.0/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating`, {
+        r = await fetch(`https://graph.facebook.com/v21.0/${phoneId}?fields=id,display_phone_number,verified_name,quality_rating`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: ctrl.signal,
         });

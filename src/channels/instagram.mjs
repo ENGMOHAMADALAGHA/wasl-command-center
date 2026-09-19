@@ -17,7 +17,7 @@ async function graph(path, token, body) {
   const ctrl = new AbortController();
   const timer = setTimeout(() => ctrl.abort(), 15000);
   try {
-    const r = await fetch(`https://graph.facebook.com/v18.0${path}?access_token=${encodeURIComponent(token)}`, {
+    const r = await fetch(`https://graph.facebook.com/v21.0${path}?access_token=${encodeURIComponent(token)}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: ctrl.signal,

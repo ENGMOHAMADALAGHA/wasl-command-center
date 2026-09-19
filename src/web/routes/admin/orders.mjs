@@ -10,9 +10,13 @@ export function registerOrderRoutes(app) {
   app.get("/admin/orders", async (req, res) => {
     const scope = resolveScope(req, req.query.tenant);
     if (scope.denied) return denyGlobal(res);
+    const page = Math.max(1, Number(req.query.page || 1));
+    const limit = Math.min(Math.max(1, Number(req.query.limit || 50)), 100);
     const { listOrdersAll } = await import("../../../../orders.mjs");
     const _or = scope.global ? await listOrdersAll() : await listOrders(scope.tenant);
-    res.json({ count: _or.length, orders: _or });
+    const total = _or.length;
+    const slice = _or.slice((page - 1) * limit, page * limit);
+    res.json({ count: total, page, limit, orders: slice });
   });
   // ملخص عددي خفيف للطلبات (للكواجهات KPI — تجميع واحد بدل سحب 500 صف)
   app.get("/admin/orders/summary", async (req, res) => {

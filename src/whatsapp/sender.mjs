@@ -87,7 +87,7 @@ export async function sendWhatsAppMessage(to, text, tenantInput = null) {
     return { simulated: true, to, text };
   }
 
-  const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
 
   try {
     const data = await graphPost(url, token, {
@@ -115,7 +115,7 @@ async function sendPayload(to, payload, tenantInput = null) {
     console.log(`  📤 [محاكاة إرسال ${payload.type}] إلى ${to}: ${JSON.stringify(payload).slice(0, 200)}`);
     return { simulated: true, to, payload };
   }
-  const url = `https://graph.facebook.com/v18.0/${phoneId}/messages`;
+  const url = `https://graph.facebook.com/v21.0/${phoneId}/messages`;
   const data = await graphPost(url, token,
     { messaging_product: "whatsapp", to, ...payload },
     `${payload.type}:${tenant?.id || phoneId}`);

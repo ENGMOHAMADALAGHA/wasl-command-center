@@ -1,7 +1,7 @@
 {
   "name": "wasl-command-center",
   "version": "1.0.0",
-    "description": "Wasl Command Center - منصة واتساب متعددة البوتات",
+  "description": "Wasl Command Center - منصة واتساب متعددة البوتات",
   "type": "module",
   "engines": {
     "node": ">=20"
@@ -65,7 +65,8 @@
     "jsonwebtoken": "^9.0.3",
     "openai": "^4.104.0",
     "pg": "^8.23.0",
-    "prisma": "^7.10.0"
+    "prisma": "^7.10.0",
+    "helmet": "^7.1.0"
   },
   "devDependencies": {
     "electron": "^44.2.0",

@@ -398,6 +398,11 @@
           <option value="general">📦 عام</option>
         </datalist>
         <label class="flex items-center gap-2 text-sm"><input id="botBooking" type="checkbox"> 📅 تفعيل الحجوزات والمواعيد لهذا البوت</label>
+        <textarea id="botProducts" class="field" rows="2" placeholder="المنتجات (سطر لكل منتج: الاسم | السعر) مثال: حذاء ركض | 50"></textarea>
+        <div class="flex gap-2">
+          <input id="botDeliveryFee" class="field flex-1" placeholder="رسوم التوصيل (مثال: 5)" dir="ltr" type="number">
+          <input id="botTone" class="field flex-1" placeholder="نبرة البوت (مثال: ودود ومهني)">
+        </div>
       </div>
       <!-- Step 2: whatsapp -->
       <div class="wiz-pane space-y-2 hidden" data-pane="1">
@@ -1411,6 +1416,9 @@ function fillBotForm(t) {
   $("botBotName").value = t?.botName || "";
   $("botBiz").value = t?.businessType || "general";
   $("botBooking").checked = !!(t?.features && t.features.booking);
+  $("botProducts").value = (t?.products || []).map(p => `${p.name} | ${p.price}`).join("\n");
+  $("botDeliveryFee").value = t?.deliveryFee ?? 5;
+  $("botTone").value = t?.tone || "";
   $("botPhoneId").value = t?.phoneNumberId || t?.phone_number_id || "";
   $("botVerify").value = t?.verifyToken || t?.verify_token || "";
   $("botToken").value = "";
@@ -1452,6 +1460,11 @@ function collectBotForm() {
     const [type, number, name] = line.split("|").map((s) => s.trim());
     return { type: type || "محفظة", number: number || "", name: name || "" };
   }).filter((w) => w.number);
+  const products = $("botProducts").value.split("\n").map(s=>s.trim()).filter(Boolean).map(line=>{
+    const [name, price] = line.split("|").map(s=>s.trim());
+    const p = Number(price);
+    return { name: name||"", price: isNaN(p)?0:p };
+  }).filter(p=>p.name);
   const features = { ...editingFeatures };
   if ($("botCliqNum").value.trim()) features.cliq = { number: $("botCliqNum").value.trim(), name: $("botCliqName").value.trim() };
   else delete features.cliq;
@@ -1471,6 +1484,10 @@ function collectBotForm() {
     trialEndsAt: $("botTrial").value || null,
     enabled: $("botEnabled").checked,
   };
+  if (products.length) body.products = products;
+  const fee = Number($("botDeliveryFee").value.trim());
+  if (!isNaN(fee) && $("botDeliveryFee").value.trim()!=="") body.deliveryFee = fee;
+  if ($("botTone").value.trim()) body.tone = $("botTone").value.trim();
   if (Object.keys(features).length) body.features = features;
   if ($("botToken").value.trim()) body.whatsappToken = $("botToken").value.trim();
   if (!editingBotId) body.id = $("botId").value.trim();
