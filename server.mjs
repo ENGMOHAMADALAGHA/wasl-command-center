@@ -52,9 +52,9 @@ if (process.env.NODE_ENV === "production") {
     console.error("  ☠️ الإنتاج يتطلب META_APP_SECRET — أرفض الإقلاع (فشل-سريع). أضفه في Render > Environment.");
     process.exit(1);
   }
-  // TOKEN_ENC_KEY ناقص = سقوط صامت للتوكن المشترك — تحذير عالٍ (لا إيقاف: البوتات بلا توكن مشفر تعمل بالمشترك)
   if (!process.env.TOKEN_ENC_KEY) {
-    console.error("  ⚠️ الإنتاج بلا TOKEN_ENC_KEY — أي بوت بتوكن مشفر سيسقط للمشترك. أضفه في Render > Environment.");
+    console.error("  ☠️ الإنتاج يتطلب TOKEN_ENC_KEY — أرفض الإقلاع (فشل-سريع). بدونه التوكنات تُحفظ مكشوفة أو السقوط للتوكن المشترك. أضفه في Render > Environment (32 بايت hex).");
+    process.exit(1);
   }
   // A4: توكن تحقق افتراضي = خطف اشتراك مؤكد — ارفض الإقلاع (فشل-سريع).
   // (قبل النشر: قيمة قوية في Render > Environment + تحديث Callback بلوحة Meta بها)

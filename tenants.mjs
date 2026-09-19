@@ -30,7 +30,7 @@ function toPublic(t) {
     botName: t.botName,
     enabled: t.enabled !== false,
     businessType: t.businessType,
-    phone_number_id: t.phoneNumberId || process.env.WHATSAPP_PHONE_ID || null,
+    phone_number_id: t.phoneNumberId || null,
     productsCount: (t.products || []).length,
     plan: t.plan || "trial",
     trialEndsAt: t.trialEndsAt || null,
@@ -67,18 +67,10 @@ export async function getTenant(id) {
 // (واتساب: phoneNumberId — ماسنجر: features.messengerPageId — انستغرام: features.instagramId)
 export async function resolveTenant({ phoneNumberId, verifyToken, pageId, channel } = {}) {
   const tenants = await loadTenants();
-  const envPhoneId = process.env.WHATSAPP_PHONE_ID;
-  const envVerify = process.env.WEBHOOK_VERIFY_TOKEN || "my_secret_token";
 
   if (phoneNumberId) {
-    // أولاً: كل البوتات المسجلة على هذا الرقم — يجب أن يكون واحداً فقط.
-    // رقم مشترك = خطأ إعداد: نرفض التوجيه (fail-closed) بدل تخمين بوت —
-    // لا أفضلية لأي بوت؛ كل البوتات سواسية داخل منصة وصل.
     const matches = tenants.filter((t) => t.phoneNumberId && t.phoneNumberId === phoneNumberId);
     if (matches.length > 1) {
-      // رقم مشترك = خطأ إعداد (رقم واحد لكل بوت). fail-closed افتراضياً.
-      // استثناء معلن واحد: SHARED_NUMBER_TENANT_ID (وضع قائم مؤقت حتى فصل الأرقام) —
-      // يُسجَّل بصوت عالٍ في كل مرة حتى لا يبقى صامتاً.
       const designated = SHARED_NUMBER_TENANT_ID && matches.find((t) => t.id === SHARED_NUMBER_TENANT_ID);
       if (designated) {
         console.error(`  ⛔ رقم مشترك ${phoneNumberId} على ${matches.map((t) => t.id).join("، ")} — توجيه مؤقت معلن إلى "${designated.id}" (SHARED_NUMBER_TENANT_ID). افصل الأرقام فوراً: رقم واحد لكل بوت`);
@@ -89,22 +81,18 @@ export async function resolveTenant({ phoneNumberId, verifyToken, pageId, channe
     }
     const exact = matches[0];
     if (exact) return withEnvDefaults(exact);
-    // ثانياً: مطابقة رقم البيئة المشترك (بوتات بلا رقم خاص)
-    const def = tenants.find((t) => (t.phoneNumberId || envPhoneId) === phoneNumberId);
-    if (def) return withEnvDefaults(def);
-    // رقم بوت غير معروف إطلاقاً — لا نعالجه كبوت افتراضي (منع خلط المستأجرين)
     console.warn(`  ⛔ phone_number_id غير مسجل (${phoneNumberId}) — تجاهل لتجنب خلط البوتات`);
     return null;
   }
   if (verifyToken) {
-    // A3: مطابقة غامضة مرفوضة — بوتات بلا verifyToken خاص كانت تُسند للأول صامتاً.
-    // مطابقة واحدة = تعمل (توافق قائم)؛ أكثر من واحدة = رفض صريح بدل تخمين بوت.
-    const hits = tenants.filter((t) => (t.verifyToken || envVerify) === verifyToken);
+    const hits = tenants.filter((t) => t.verifyToken && t.verifyToken === verifyToken);
     if (hits.length > 1) {
       console.error(`  ⛔ توكن تحقق غامض على ${hits.map((t) => t.id).join("، ")} — أعطِ كل بوت verifyToken خاصاً من /admin/tenants`);
       return null;
     }
     if (hits[0]) return withEnvDefaults(hits[0]);
+    console.warn(`  ⛔ verify_token غير مسجل — تجاهل`);
+    return null;
   }
   // قنوات وصل: ماسنجر/انستغرام تُحل عبر معرف الصفحة/الحساب ببيانات البوت —
   // رقم واحد لكل هوية: التكرار مرفوض مثل أرقام واتساب (fail-closed)
@@ -125,24 +113,24 @@ export async function resolveTenant({ phoneNumberId, verifyToken, pageId, channe
   return null;
 }
 
-const envFallbackWarned = new Set();
 function withEnvDefaults(t) {
   let perTenantToken = null;
+  let decryptFailed = false;
   try {
-    // فك متزامن وخفيف (AES-GCM) — التوكن الخاص أولاً، ثم المشترك
     if (t?.whatsappToken) perTenantToken = decryptSecret(t.whatsappToken);
-  } catch { /* رجوع للمشترك */ }
-  // شفافية المنصة: البوت بلا بياناته الخاصة يستخدم المشتركة — نحذر مرة واحدة لكل بوت
-  // (الحالة الصحيحة: كل بوت له phoneNumberId وتوكن خاصان من /admin/tenants)
-  if ((!t?.phoneNumberId || !perTenantToken) && t?.id && !envFallbackWarned.has(t.id)) {
-    envFallbackWarned.add(t.id);
-    console.warn(`  ⚠️ البوت ${t.id} بلا بيانات ربط خاصة (يستخدم المشتركة) — أدخل phoneNumberId والتوكن من /admin/tenants`);
+  } catch (e) {
+    decryptFailed = true;
+    console.error(`  ☠️ فشل فك تشفير توكن البوت ${t?.id}: ${e.message} — يلزم إعادة حفظ التوكن بـ TOKEN_ENC_KEY الصحيح`);
   }
+  if (!t?.phoneNumberId || !perTenantToken) {
+    if (t?.id) console.error(`  ⛔ البوت ${t.id} بلا بيانات ربط خاصة — يلزم phoneNumberId وتوكن خاص (لا مشترك)`);
+  }
+  if (decryptFailed) perTenantToken = null;
   return {
     ...t,
-    phone_number_id: t.phoneNumberId || process.env.WHATSAPP_PHONE_ID || null,
-    verify_token: t.verifyToken || process.env.WEBHOOK_VERIFY_TOKEN || "my_secret_token",
-    whatsapp_token: perTenantToken || process.env.WHATSAPP_TOKEN || null,
+    phone_number_id: t.phoneNumberId || null,
+    verify_token: t.verifyToken || null,
+    whatsapp_token: perTenantToken || null,
     hasOwnToken: !!perTenantToken,
     trialExpired: isTrialExpired(t),
   };

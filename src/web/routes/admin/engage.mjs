@@ -19,7 +19,6 @@ export function registerEngageRoutes(app) {
       return res.status(400).json({ ok: false, error: "tenantId و text و phones[] مطلوبة" });
     }
     if (phones.length > 50) return res.status(400).json({ ok: false, error: "الحد الأقصى 50 رقم لكل بث" });
-    // توحيد كل الأرقام E.164 — أي صيغة (079/00962/+) تعمل
     const normPhones = [...new Set(phones.map((p) => normalizePhone(p)).filter(Boolean))];
     const tenant = await getTenantFull(tenantId);
     if (!tenant) return res.status(404).json({ ok: false, error: "tenant غير موجود" });
@@ -27,7 +26,6 @@ export function registerEngageRoutes(app) {
     if (!isTenantActive(tenant)) {
       return res.status(403).json({ ok: false, error: tenant.enabled === false ? "هذا البوت موقوف" : "الفترة التجريبية لهذا البوت انتهت — جدد الخطة" });
     }
-    // امتثال: استبعاد من ألغوا الاشتراك قبل الإرسال
     const { isOptedOut } = await import("../../../compliance/messaging.mjs");
     const eligible = [];
     const skippedOptOut = [];
@@ -35,28 +33,45 @@ export function registerEngageRoutes(app) {
       if (await isOptedOut(tenantId, phone)) skippedOptOut.push(phone);
       else eligible.push(phone);
     }
-    const results = [];
-    let skippedSimulated = 0;
-    for (const phone of eligible) {
-      try {
-        // عبر البديل الموحد: يحترم opt-out والنافذة والمحاكاة — لا "نجاح" وهمي
-        const { sendWithWindowFallback } = await import("../../../compliance/messaging.mjs");
-        const r = await sendWithWindowFallback(phone, text, tenant);
-        if (r.ok) {
-          await pushHistory(phone, "assistant", text, tenant);
-          results.push({ phone, ok: true });
-        } else {
-          if (r.reason === "simulated-no-credentials") skippedSimulated++;
-          results.push({ phone, ok: false, error: r.reason });
-        }
-      } catch (e) {
-        results.push({ phone, ok: false, error: e.message });
-      }
-      await new Promise((r) => setTimeout(r, 800)); // تجنب rate limit
+    if (!eligible.length) {
+      const rec = await saveBroadcast({ tenantId, text, phones: normPhones, results: normPhones.map((p) => ({ phone: p, ok: false, error: skippedOptOut.includes(p) ? "opted-out" : "no-eligible" })) });
+      return res.json({ ok: true, broadcast: rec, skippedOptOut, skippedSimulated: 0, queued: 0 });
     }
-    const rec = await saveBroadcast({ tenantId, text, phones: normPhones, results });
-    logEvent("broadcast", { tenantId, count: normPhones.length, sent: results.filter((r) => r.ok).length, broadcastId: rec.id, skippedOptOut: skippedOptOut.length, skippedSimulated }).catch(() => {});
-    res.json({ ok: true, broadcast: rec, skippedOptOut, skippedSimulated });
+    const { outboundQueue } = await import("../../../jobs/queue.mjs");
+    const broadcastId = `bc_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+    const rec = await saveBroadcast({ tenantId, text, phones: normPhones, results: eligible.map((p) => ({ phone: p, ok: false, pending: true })) });
+    // حفظ معرف البث الحقيقي للربط — نحدّثه لاحقاً بالنتائج
+    const jobLabel = `broadcast:${broadcastId}:${tenantId}`;
+    outboundQueue.enqueue(jobLabel, async () => {
+      const results = [];
+      let skippedSimulated = 0;
+      for (const phone of eligible) {
+        try {
+          const { sendWithWindowFallback } = await import("../../../compliance/messaging.mjs");
+          const r = await sendWithWindowFallback(phone, text, tenant);
+          if (r.ok) {
+            await pushHistory(phone, "assistant", text, tenant);
+            results.push({ phone, ok: true });
+          } else {
+            if (r.reason === "simulated-no-credentials") skippedSimulated++;
+            results.push({ phone, ok: false, error: r.reason });
+          }
+        } catch (e) {
+          results.push({ phone, ok: false, error: e.message });
+        }
+        await new Promise((r) => setTimeout(r, 800));
+      }
+      try {
+        const { tenantDb } = await import("../../../security/tenantGuard.mjs");
+        const merged = normPhones.map((p) => {
+          const found = results.find((x) => x.phone === p);
+          return found || { phone: p, ok: false, error: skippedOptOut.includes(p) ? "opted-out" : "unknown" };
+        });
+        await tenantDb(tenantId).broadcast.update({ where: { id: rec.id }, data: { results: merged } }).catch(() => {});
+      } catch {}
+      logEvent("broadcast", { tenantId, count: normPhones.length, sent: results.filter((r) => r.ok).length, broadcastId: rec.id, skippedOptOut: skippedOptOut.length, skippedSimulated }).catch(() => {});
+    });
+    res.status(202).json({ ok: true, queued: true, broadcastId: rec.id, broadcast: rec, skippedOptOut, eligible: eligible.length });
   });
   app.get("/admin/broadcasts", async (req, res) => {
     const scope = resolveScope(req, req.query.tenant);

@@ -32,6 +32,7 @@ model Tenant {
   events       Event[]
   users        TenantUser[]
 
+  @@unique([phoneNumberId])
   @@map("tenants")
 }
 

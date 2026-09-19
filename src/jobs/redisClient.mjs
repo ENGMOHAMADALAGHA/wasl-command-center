@@ -3,12 +3,11 @@
 // - بدون REDIS_URL أو بدون حزمة ioredis → يرجع null ويعمل وضع الذاكرة.
 // - التحميل كسول ولا يكسر الإقلاع أبداً.
 // ──────────────────────────────────────────────
-import { REDIS_URL } from "../config/env.mjs";
-
 let clientPromise = null;
 let unavailableLogged = false;
 
 export async function getRedis() {
+  const REDIS_URL = process.env.REDIS_URL || (await import("../config/env.mjs").then(m=>m.REDIS_URL).catch(()=> ""));
   if (!REDIS_URL) return null;
   if (!clientPromise) {
     clientPromise = (async () => {
