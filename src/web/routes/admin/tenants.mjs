@@ -12,13 +12,16 @@ export function registerTenantRoutes(app) {
   });
   app.get("/admin/redis-test", async (req, res) => {
     if (!req.isSuperAdmin) return res.status(403).json({ ok: false });
+    const hasUrl = !!process.env.REDIS_URL;
+    const urlLen = String(process.env.REDIS_URL||"").length;
+    const urlStart = String(process.env.REDIS_URL||"").slice(0,18);
     try {
       const { getRedis } = await import("../../../jobs/redisClient.mjs");
       const r = await getRedis();
-      if (!r) return res.json({ ok: false, hasUrl: !!process.env.REDIS_URL, error: "getRedis null" });
+      if (!r) return res.json({ ok: false, hasUrl, urlLen, urlStart, error: "getRedis null — REDIS_URL empty or ioredis not installed" });
       const pong = await r.ping();
-      res.json({ ok: true, pong, hasUrl: true });
-    } catch (e) { res.json({ ok: false, error: e.message, hasUrl: !!process.env.REDIS_URL }); }
+      res.json({ ok: true, pong, hasUrl, urlLen, urlStart });
+    } catch (e) { res.json({ ok: false, error: e.message?.slice(0,150), hasUrl, urlLen, urlStart }); }
   });
   app.get("/admin/tenants", async (req, res) => {
     const list = await listTenants();
