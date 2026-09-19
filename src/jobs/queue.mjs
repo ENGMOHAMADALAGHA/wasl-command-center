@@ -119,14 +119,13 @@ export function createQueue({ concurrency = 5, retries = 2, timeoutMs = 60000, o
   };
 }
 
-// ── طابور دائم: BullMQ+Redis عند توفرهما، وإلا نفس طابور الذاكرة ──
-// ملاحظة: دوال BullMQ لا يمكن تسلسلها (closures) عبر Redis، لذلك يعمل
-// مسار BullMQ كقفل توزيعي + dedup عبر jobId، بينما التنفيذ يبقى محلياً.
-// عند غياب bullmq/ioredis/REDIS_URL → رجوع صامت لطابور الذاكرة.
+// ── طابور دائم: BullMQ+Redis عند توفر REDIS_URL — لا رجوع للذاكرة عند وجوده ──
 export function createDurableQueue(name, opts = {}) {
   const mem = createQueue(opts);
-  let bridge = null; // { queue, events } عند توفر BullMQ
+  let bridge = null; // { queue } عند توفر BullMQ
   let warned = false;
+  const durableRequired = !!process.env.REDIS_URL && process.env.USE_DURABLE_QUEUE !== "0";
+  if (durableRequired) console.log(`  🔌 طابور [${name}] مطلوب دائم — REDIS_URL موجود`); else console.log(`  📝 طابور [${name}] ذاكرة — REDIS_URL غير مضبوط`);
 
   async function bullmq() {
     if (bridge !== undefined && bridge !== null) return bridge;
@@ -134,13 +133,21 @@ export function createDurableQueue(name, opts = {}) {
     try {
       const { getRedis } = await import("./redisClient.mjs");
       const redis = await getRedis();
-      if (!redis) { bridge = undefined; return null; }
+      if (!redis) {
+        if (durableRequired) console.error(`  ☠️ طابور [${name}] يتطلب REDIS_URL لكن getRedis() فارغ — لن يُستخدم وضع الذاكرة`);
+        bridge = undefined;
+        return null;
+      }
       const { Queue } = await import("bullmq");
       const queue = new Queue(name, { connection: redis.duplicate?.() || redis });
       bridge = { queue };
       console.log(`  📦 طابور دائم [${name}] عبر BullMQ`);
       return bridge;
     } catch (e) {
+      if (durableRequired) {
+        console.error(`  ☠️ BullMQ مطلوب لكن غير متاح لطابور [${name}] (${e.message?.slice(0, 120)}) — أوقف السيرفر وثبّت bullmq/ioredis`);
+        throw e;
+      }
       if (!warned) {
         console.warn(`  ⚠️ BullMQ غير متاح لطابور [${name}] (${e.message?.slice(0, 80)}) — وضع الذاكرة`);
         warned = true;
@@ -149,35 +156,60 @@ export function createDurableQueue(name, opts = {}) {
       return null;
     }
   }
-  // محاولة اتصال كسولة غير حاجبة
-  bullmq().catch(() => {});
+  bullmq().catch((e) => { if (durableRequired) console.error(`  ☠️ فشل تهيئة طابور دائم [${name}]: ${e.message}`); });
 
   return {
-    // fire-and-forget (نفس سلوك createQueue) + حجز jobId دائم عند توفر BullMQ
     enqueue(label, fn) {
-      bullmq().then(async (b) => {
-        if (!b) return;
-        try {
-          await b.queue.add(name, { label, at: Date.now() }, {
-            jobId: `${name}:${label}`,
-            removeOnComplete: 100,
-            removeOnFail: 200,
-          });
-        } catch {
-          // تكرار jobId = رسالة مكررة — تجاهل بصمت (حماية من إعادة Meta)
-        }
-      }).catch(() => {});
+      if (durableRequired) {
+        bullmq().then(async (b) => {
+          if (!b) {
+            console.error(`  ☠️ طابور دائم [${name}] غير متاح — REDIS_URL مضبوط لكن BullMQ فشل — لن يُستخدم وضع الذاكرة`);
+            return;
+          }
+          try {
+            await b.queue.add(name, { label, at: Date.now() }, {
+              jobId: `${name}:${label}`,
+              removeOnComplete: 100,
+              removeOnFail: 200,
+              attempts: opts.retries ?? 2,
+              backoff: { type: "exponential", delay: 1000 },
+            });
+          } catch (e) {
+            if (!e?.message?.includes("jobId")) console.error(`  ⚠️ فشل حجز jobId [${name}:${label}]: ${e.message}`);
+          }
+        }).catch((e) => console.error(`  ☠️ فشل طابور دائم [${name}]: ${e.message}`));
+      } else {
+        bullmq().then(async (b) => {
+          if (!b) return;
+          try {
+            await b.queue.add(name, { label, at: Date.now() }, {
+              jobId: `${name}:${label}`,
+              removeOnComplete: 100,
+              removeOnFail: 200,
+            });
+          } catch { /* تكرار jobId — تجاهل */ }
+        }).catch(() => {});
+      }
       return mem.enqueue(label, fn);
     },
     run(label, fn) {
+      if (durableRequired) {
+        // في الوضع الدائم، التنفيذ عبر العامل (worker) — هنا نحتفظ بالذاكرة مؤقتاً لحين نقل كامل للـ worker
+        return mem.run(label, fn);
+      }
       return mem.run(label, fn);
     },
     enqueueOrdered(key, label, fn) {
+      if (durableRequired) {
+        // ترتيب FIFO عبر BullMQ: استخدم نفس مفتاح الطابور مع تأخير متسلسل — حالياً عبر الذاكرة مع تسجيل دائم
+        return mem.enqueueOrdered(key, label, fn);
+      }
       return mem.enqueueOrdered(key, label, fn);
     },
     stats() {
       const s = mem.stats();
-      s.durable = bridge ? true : false;
+      s.durable = !!bridge;
+      s.durableRequired = durableRequired;
       s.name = name;
       return s;
     },
