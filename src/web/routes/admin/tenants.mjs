@@ -10,6 +10,16 @@ export function registerTenantRoutes(app) {
     const { webhookQueue } = await import("../../../jobs/queue.mjs");
     res.json({ ok: true, ...webhookQueue.stats() });
   });
+  app.get("/admin/redis-test", async (req, res) => {
+    if (!req.isSuperAdmin) return res.status(403).json({ ok: false });
+    try {
+      const { getRedis } = await import("../../../jobs/redisClient.mjs");
+      const r = await getRedis();
+      if (!r) return res.json({ ok: false, hasUrl: !!process.env.REDIS_URL, error: "getRedis null" });
+      const pong = await r.ping();
+      res.json({ ok: true, pong, hasUrl: true });
+    } catch (e) { res.json({ ok: false, error: e.message, hasUrl: !!process.env.REDIS_URL }); }
+  });
   app.get("/admin/tenants", async (req, res) => {
     const list = await listTenants();
     res.json({ count: list.length, tenants: list, memory: getMemoryStats() });
@@ -21,6 +31,10 @@ export function registerTenantRoutes(app) {
       const { whatsappToken: _s, ...safe } = created;
       res.status(201).json({ ok: true, tenant: { ...safe, hasOwnToken: !!created.whatsappToken } });
     } catch (e) {
+      if (e?.code === "P2002") {
+        const field = e?.meta?.target?.join?.(",") || "phone_number_id";
+        return res.status(409).json({ ok: false, error: `تعارض: ${field} مسجل مسبقاً — رقم واحد لكل بوت` });
+      }
       res.status(400).json({ ok: false, error: e.message });
     }
   });
@@ -35,6 +49,10 @@ export function registerTenantRoutes(app) {
       console.log(`  🔌 tenant ${updated.id} enabled=${updated.enabled} plan=${updated.plan}`);
       res.json({ ok: true, tenant: { id: updated.id, enabled: updated.enabled, plan: updated.plan, trialExpired: isTrialExpired(updated) } });
     } catch (e) {
+      if (e?.code === "P2002") {
+        const field = e?.meta?.target?.join?.(",") || "phone_number_id";
+        return res.status(409).json({ ok: false, error: `تعارض: ${field} مسجل مسبقاً — رقم واحد لكل بوت` });
+      }
       // P2025 = البوت غير موجود بهذه القاعدة (قائمة قديمة؟ سيرفر مختلف؟) — 404 واضحة بدل 400 عمياء
       if (e?.code === "P2025") {
         return res.status(404).json({ ok: false, error: `البوت "${req.params.id}" غير موجود — حدّث قائمة البوتات وحاول مجدداً` });
